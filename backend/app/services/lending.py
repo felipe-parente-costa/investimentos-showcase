@@ -25,8 +25,8 @@ This module:
   note are passed in ``confirmed_trades`` and never touched (a genuine
   trade right next to a same-quantity contract event is undecidable from
   the files alone);
-- emits truncation pairs against the XP gabarito (`truncation_legs`):
-  project policy fixes the target PM at XP's per-operation 2-decimal
+- emits truncation pairs against the brokerage gabarito (`truncation_legs`):
+  project policy fixes the target PM at the brokerage's per-operation 2-decimal
   truncation, so after the full-precision replay each gabarito ticker gets
   a +1/-1 cost pair (fixed-point iterated) closing the gap. The engine
   stays full-precision Decimal; truncation enters as auditable data legs.
@@ -395,7 +395,7 @@ def reconcile(
         if key in kept_with_warning:
             warning.message += (
                 " [reconciler: matched a contract whose slot is taken; kept as "
-                "trade — confirm on the XP brokerage note]"
+                "trade — confirm on the brokerage note]"
             )
             warnings.append(warning)
             continue
@@ -444,7 +444,7 @@ def truncation_legs(
     currency: str = "BRL",
 ) -> list[ParsedTransaction]:
     """+1/-1 cost pairs closing the gap between the full-precision replay and
-    the XP truncated gabarito {ticker: (qty, pm)}, per project PM policy.
+    the brokerage-truncated gabarito {ticker: (qty, pm)}, per project PM policy.
 
     Fails loud if the replayed quantity does not match the gabarito —
     a truncation pair fixes rounding, never quantity.
@@ -555,8 +555,8 @@ def _pair(ticker: str, on: date, price: Decimal) -> list[ParsedTransaction]:
             unit_price=unit_price,
             total_value=qty * unit_price,
             notes=(
-                f"[par-truncagem-xp] {half}: ajusta o custo do replay em "
-                "precisão cheia à convenção truncada da XP (política de PM "
+                f"[par-truncagem-corretora] {half}: ajusta o custo do replay em "
+                "precisão cheia à convenção truncada da corretora (política de PM "
                 "do projeto); qty líquida do par = 0"
             ),
         )
