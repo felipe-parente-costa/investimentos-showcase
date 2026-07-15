@@ -41,6 +41,10 @@ ajustes e correções auditáveis.
 |---|---|
 | ![Renda Fixa](docs/screenshots/renda-fixa.png) | ![Lançamentos](docs/screenshots/lancamentos.png) |
 
+| Mercado (indicadores externos) | Correlação (matriz de Pearson) |
+|---|---|
+| ![Mercado](docs/screenshots/mercado.png) | ![Correlação](docs/screenshots/correlacao.png) |
+
 **Importar — o coração da automação:** arraste o arquivo exportado da fonte e pronto.
 
 ![Importar](docs/screenshots/importar.png)
@@ -88,6 +92,19 @@ operação dedicada `custody_transfer` que preserva preço médio e não gera P&
 
 **Tesouro Direto marcado a mercado** pela série de PU do CSV oficial do Tesouro
 Transparente; renda fixa privada fica a custo com aviso na janela exibida.
+
+**Seção Mercado: contexto, não gatilho.** Indicadores externos (Medo & Ganância,
+preço/dominância do BTC, Múltiplo de Mayer, IBOV, S&P 500, VIX, DXY, Treasuries) com
+uma regra editorial estrita: sem rótulo de compra/venda, sem "barato/caro" — cor
+semântica só nas setas de variação. Cada fonte tem cache próprio e falha de forma
+independente (mostra "—" sem derrubar a seção), com a fonte e a data sempre visíveis
+no rodapé de cada card.
+
+**Correlação e CAPM sobre as cotações em cache.** Matriz de Pearson dos retornos
+diários da carteira (com seleção de ativos e um recorte automático das 10 maiores
+posições) e, por segmento, beta, alfa de Jensen e correlação contra o benchmark —
+tudo computado localmente a partir das séries já cacheadas, sem chamadas externas
+no request path.
 
 ## Rodando a demo
 
