@@ -134,7 +134,6 @@ frontend/
 ## O que ficou de fora da vitrine
 
 A suíte de testes do projeto real (30+ arquivos, incluindo testes de parser contra
-extratos reais anonimizados) não acompanha esta demo justamente por depender dessas
-fixtures. Os parsers estão no código (`app/parsers/`) e a tela **Importar** funciona —
+extratos reais) não acompanha esta demo justamente por depender dessas fixtures. Os parsers estão no código (`app/parsers/`) e a tela **Importar** funciona —
 mas sem arquivos de extrato para alimentá-la, o caminho demonstrado aqui é a API de
 transações manuais.

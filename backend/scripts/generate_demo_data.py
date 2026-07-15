@@ -241,7 +241,7 @@ def build_transactions(seed: int) -> list[dict]:
             qty = quantize_qty(spec, rng.uniform(0.2, 3.0))
             emit(spec, day, "buy", qty, price_on(spec, day, rng), institution=US_BROKER)
             held[spec.ticker] = held.get(spec.ticker, Decimal(0)) + qty
-    for spec in (s for s in US_ASSETS if s.ticker in ("JPM", "KO", "SCHW")):
+    for spec in (s for s in US_ASSETS if s.ticker in ("JPM", "KO")):
         for month in month_starts(US_START, PERIOD_END)[2::3]:
             qty = held.get(spec.ticker)
             if not qty:
