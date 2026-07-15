@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/* Typography scale (Fase 1 do redesign): 4 níveis reutilizáveis de tipografia,
+   aplicados primeiro no Dashboard e a propagar para as demais telas depois.
+   Apenas tamanho/peso — sem cor; combinar com utilitários de cor conforme o uso. */
+@layer components {
+  .text-hero {
+    @apply text-5xl font-semibold tracking-tight tabular-nums;
+  } /* ~48px — número herói (patrimônio total) */
+  .text-section {
+    @apply text-lg font-semibold;
+  } /* ~18px — título de seção/card */
+  .text-body {
+    @apply text-sm;
+  } /* ~14px — corpo */
+  .text-caption {
+    @apply text-xs;
+  } /* ~12px — legenda/rótulo */
+}

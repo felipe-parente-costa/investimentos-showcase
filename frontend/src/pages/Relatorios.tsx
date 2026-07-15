@@ -1,0 +1,340 @@
+import { useCallback, useEffect, useState } from 'react'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import {
+  generateMonthlyReport,
+  getMonthlyReport,
+  getMonthlyReports,
+  type SnapshotDetail,
+  type SnapshotSummary,
+} from '../api/client'
+import AllocationDonut, { type DonutSlice } from '../components/AllocationDonut'
+import {
+  ASSET_CLASS_LABELS,
+  formatMoney,
+  formatQuantity,
+  formatSignedPercent,
+  prettifyInstitution,
+} from '../lib/format'
+import { classColor, CURRENCY_COLORS, SECTION_COLORS } from '../lib/colors'
+
+const monthFormatter = new Intl.DateTimeFormat('pt-BR', {
+  month: 'short',
+  year: 'numeric',
+})
+
+function monthLabel(yearMonth: string): string {
+  return monthFormatter.format(new Date(`${yearMonth}-15T12:00:00`))
+}
+
+const compactBRL = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  notation: 'compact',
+  maximumFractionDigits: 0,
+})
+
+function pctColor(value: string | null): string {
+  if (value == null) return 'text-slate-400'
+  const n = Number(value)
+  return n > 0 ? 'text-green-400' : n < 0 ? 'text-red-400' : 'text-slate-300'
+}
+
+function pct(value: string | null): string {
+  return value == null ? '—' : formatSignedPercent(Number(value) / 100)
+}
+
+function dictToSlices(
+  dict: Record<string, string>,
+  label: (key: string) => string,
+  color?: (key: string) => string | undefined,
+): DonutSlice[] {
+  return Object.entries(dict).map(([key, value]) => ({
+    label: label(key),
+    value: Number(value),
+    color: color?.(key),
+  }))
+}
+
+export default function Relatorios() {
+  const [items, setItems] = useState<SnapshotSummary[]>([])
+  const [selected, setSelected] = useState<string | null>(null)
+  const [detail, setDetail] = useState<SnapshotDetail | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadList = useCallback(() => {
+    return getMonthlyReports()
+      .then((data) => {
+        setItems(data.items)
+        setSelected((current) => current ?? data.items.at(-1)?.year_month ?? null)
+        setError(null)
+      })
+      .catch(() => setError('Não foi possível carregar os relatórios.'))
+  }, [])
+
+  useEffect(() => {
+    loadList()
+  }, [loadList])
+
+  useEffect(() => {
+    if (!selected) return
+    let cancelled = false
+    getMonthlyReport(selected)
+      .then((data) => !cancelled && setDetail(data))
+      .catch(() => !cancelled && setError('Não foi possível carregar o relatório.'))
+    return () => {
+      cancelled = true
+    }
+  }, [selected])
+
+  async function generate() {
+    setGenerating(true)
+    setError(null)
+    try {
+      const created = await generateMonthlyReport()
+      await loadList()
+      setSelected(created.year_month)
+      setDetail(created)
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : 'Erro ao gerar o relatório.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const evolution = items.map((s) => ({
+    month: s.year_month,
+    total: Number(s.total_brl),
+  }))
+
+  return (
+    <main className="mx-auto max-w-6xl space-y-6 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Relatórios mensais</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Snapshots congelados da carteira no fim de cada mês.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={generate}
+          disabled={generating}
+          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+        >
+          {generating ? 'Gerando…' : 'Gerar relatório do mês atual'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {items.length === 0 && !error && (
+        <p className="text-sm text-slate-400">
+          Nenhum relatório ainda. Gere o snapshot do mês atual para começar.
+        </p>
+      )}
+
+      {items.length > 0 && (
+        <>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+            <p className="mb-4 text-sm text-slate-400">Evolução do patrimônio (mês a mês)</p>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={evolution} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+                  <CartesianGrid stroke="#1e293b" vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tickFormatter={monthLabel}
+                    tick={{ fill: '#64748b', fontSize: 12 }}
+                    axisLine={{ stroke: '#334155' }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tickFormatter={(v: number) => compactBRL.format(v)}
+                    tick={{ fill: '#64748b', fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={72}
+                  />
+                  <Tooltip
+                    formatter={(v) => [formatMoney(String(v)), 'Patrimônio']}
+                    labelFormatter={(l) => monthLabel(String(l))}
+                    cursor={{ fill: '#1e293b', opacity: 0.4 }}
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      border: '1px solid #334155',
+                      borderRadius: '0.5rem',
+                      color: '#e2e8f0',
+                    }}
+                  />
+                  <Bar dataKey="total" fill={SECTION_COLORS.total} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {items.map((s) => (
+              <button
+                key={s.year_month}
+                type="button"
+                onClick={() => setSelected(s.year_month)}
+                className={`rounded-lg border px-3 py-1.5 text-sm ${
+                  selected === s.year_month
+                    ? 'border-sky-500 bg-sky-500/10 text-slate-100'
+                    : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                {monthLabel(s.year_month)}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {detail && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <SummaryStat label="Patrimônio (fim do mês)" value={formatMoney(detail.total_brl)} />
+            <SummaryStat
+              label="Rentabilidade do mês"
+              value={pct(detail.month_return_pct)}
+              color={pctColor(detail.month_return_pct)}
+            />
+            <SummaryStat
+              label="Rentabilidade acumulada"
+              value={pct(detail.cumulative_return_pct)}
+              color={pctColor(detail.cumulative_return_pct)}
+            />
+            <SummaryStat
+              label="Dividendos do mês"
+              value={formatMoney(detail.income_month_brl)}
+              color="text-green-400"
+            />
+          </div>
+
+          {detail.last_recomputed_at && (
+            <p className="text-xs text-gray-500">
+              Recalculado em{' '}
+              {new Date(
+                detail.last_recomputed_at.endsWith('Z')
+                  ? detail.last_recomputed_at
+                  : detail.last_recomputed_at + 'Z',
+              ).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+              {detail.recompute_reason ? ` — ${detail.recompute_reason}` : ''}
+            </p>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            <AllocationDonut
+              title="Por classe"
+              slices={dictToSlices(
+                detail.allocation_class,
+                (k) => ASSET_CLASS_LABELS[k as keyof typeof ASSET_CLASS_LABELS] ?? k,
+                (k) => classColor(k),
+              )}
+            />
+            <AllocationDonut
+              title="Por moeda"
+              slices={dictToSlices(
+                detail.allocation_currency,
+                (k) => k,
+                (k) => CURRENCY_COLORS[k],
+              )}
+            />
+            <AllocationDonut
+              title="Por corretora"
+              slices={dictToSlices(detail.allocation_broker, (k) =>
+                k === 'Sem corretora' ? k : prettifyInstitution(k),
+              )}
+            />
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-3">Ativo</th>
+                  <th className="px-4 py-3">Classe</th>
+                  <th className="px-4 py-3">Corretora</th>
+                  <th className="px-4 py-3 text-right">Quantidade</th>
+                  <th className="px-4 py-3 text-right">Preço médio</th>
+                  <th className="px-4 py-3 text-right">Valor (R$)</th>
+                  <th className="px-4 py-3 text-right">P&L (R$)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.positions.map((p) => {
+                  const pnl = p.unrealized_pnl_brl != null ? Number(p.unrealized_pnl_brl) : null
+                  return (
+                    <tr
+                      key={p.ticker}
+                      className="border-b border-slate-800/60 last:border-b-0"
+                    >
+                      <td className="px-4 py-2 font-medium">{p.ticker}</td>
+                      <td className="px-4 py-2 text-slate-300">
+                        {ASSET_CLASS_LABELS[p.asset_class] ?? p.asset_class}
+                      </td>
+                      <td className="px-4 py-2 text-slate-300">
+                        {prettifyInstitution(p.institution)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {formatQuantity(p.quantity)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {formatMoney(p.average_price, p.currency)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {formatMoney(p.market_value_brl)}
+                      </td>
+                      <td
+                        className={`px-4 py-2 text-right tabular-nums ${
+                          pnl == null
+                            ? 'text-slate-400'
+                            : pnl >= 0
+                              ? 'text-green-400'
+                              : 'text-red-400'
+                        }`}
+                      >
+                        {pnl == null ? '—' : formatMoney(p.unrealized_pnl_brl)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </main>
+  )
+}
+
+function SummaryStat({
+  label,
+  value,
+  color = 'text-slate-100',
+}: {
+  label: string
+  value: string
+  color?: string
+}) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className={`mt-1 text-2xl font-semibold tabular-nums ${color}`}>{value}</p>
+    </div>
+  )
+}

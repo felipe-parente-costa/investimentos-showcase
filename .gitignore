@@ -1,0 +1,26 @@
+# Databases — never commit portfolio data, demo or otherwise
+*.db
+*.db-journal
+*.sqlite3
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# Backups
+backups/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# OS / editor
+.DS_Store
+*.swp
