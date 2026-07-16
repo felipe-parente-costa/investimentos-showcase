@@ -37,6 +37,12 @@ class PositionOut(BaseModel):
     unrealized_pnl: Decimal | None = None
     day_change_brl: Decimal | None = None
     day_change_pct: Decimal | None = None
+    # Trailing-12-month income in the position's own currency, and the
+    # dividend yield it implies over the current market value (both sides in
+    # the native currency, so the ratio holds in the BRL and USD views).
+    # dy is None for fixed income (no DY by definition) and unpriced positions.
+    income_12m: Decimal = Decimal("0")
+    dy_12m_pct: Decimal | None = None
     # USD view (EUA/Cripto sections): cost basis uses each transaction's PTAX,
     # market value uses native USD quotes. Null where USD is not applicable.
     usd_average_price: Decimal | None = None
@@ -170,6 +176,10 @@ class PortfolioOut(BaseModel):
     day_change_brl: Decimal | None = None
     day_change_pct: Decimal | None = None
     income_ytd_brl: Decimal = Decimal("0")
+    # Trailing-12-month income in BRL and the portfolio-level dividend yield
+    # (income_12m_brl / total market value); None when the total is zero.
+    income_12m_brl: Decimal = Decimal("0")
+    dy_12m_pct: Decimal | None = None
     segments: list[SegmentOut] = []
     segment_summaries: list[SegmentSummaryOut] = []
     usd_brl_rate: Decimal | None = None

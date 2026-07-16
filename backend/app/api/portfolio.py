@@ -1,4 +1,5 @@
-from datetime import date, datetime, timezone
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Callable
 
@@ -80,7 +81,7 @@ def get_portfolio_contributions(
     USD rows (Avenue) are converted by the PTAX of each transaction's own
     date — same get_usd_brl source the USD cost basis uses — never today's
     rate. A date with no FX available excludes that row from the sum (the
-    same silent fallback _income_ytd applies) instead of failing the call.
+    same silent fallback _income_summary applies) instead of failing the call.
     """
     months = max(1, min(months, 120))
     today = datetime.now(timezone.utc).date()
@@ -302,6 +303,8 @@ def get_portfolio(db: Session = Depends(get_db)) -> PortfolioOut:
             fx = get_usd_brl(db, datetime.now(timezone.utc).date())
         return fx
 
+    income = _income_summary(db, transactions)
+
     positions_out: list[PositionOut] = []
     total = ZERO
     total_day_change = ZERO
@@ -310,7 +313,9 @@ def get_portfolio(db: Session = Depends(get_db)) -> PortfolioOut:
     segment_counts: dict[Market, int] = {}
     segment_rows: list[SegmentRow] = []
     for position in open_positions:
-        out = _build_position(db, position, usd_rate, warnings)
+        out = _build_position(
+            db, position, usd_rate, warnings, income.last_12m_by_ticker
+        )
         positions_out.append(out)
         segment_counts[out.market] = segment_counts.get(out.market, 0) + 1
         if out.market_value_brl is not None:
@@ -345,7 +350,13 @@ def get_portfolio(db: Session = Depends(get_db)) -> PortfolioOut:
             if day_change_pct is not None
             else None
         ),
-        income_ytd_brl=_cents(_income_ytd(db, transactions)),
+        income_ytd_brl=_cents(income.ytd_brl),
+        income_12m_brl=_cents(income.last_12m_brl),
+        dy_12m_pct=(
+            (income.last_12m_brl / total).quantize(Decimal("0.000001"))
+            if total > 0
+            else None
+        ),
         segments=[
             SegmentOut(
                 market=market,
@@ -464,8 +475,12 @@ def _build_position(
     position: Position,
     usd_rate: Callable[[], FxResult | None],
     warnings: list[str],
+    income_12m_by_ticker: dict[tuple[str, str], Decimal],
 ) -> PositionOut:
     meta = get_asset_meta(db, position.ticker, position.market, position.asset_class)
+    income_12m = income_12m_by_ticker.get(
+        (position.ticker, position.currency), ZERO
+    )
     indexer = (
         resolve_indexer(position.ticker, position.asset_name, position.indexer)
         if position.asset_class is AssetClass.fixed_income
@@ -487,6 +502,7 @@ def _build_position(
         total_cost=position.total_cost,
         realized_pnl=position.realized_pnl,
         income=position.income,
+        income_12m=income_12m,
     )
 
     quote = get_quote(
@@ -524,6 +540,17 @@ def _build_position(
         if quote.currency == position.currency
         else None
     )
+    # DY = trailing-12m income over current market value, both in the
+    # position's native currency (the ratio is currency-free, so it holds in
+    # the BRL and USD views alike). Fixed income has no DY by definition;
+    # a quote in another currency would mix numerator and denominator.
+    dy_12m_pct = (
+        (income_12m / market_value).quantize(Decimal("0.000001"))
+        if position.asset_class is not AssetClass.fixed_income
+        and quote.currency == position.currency
+        and market_value > 0
+        else None
+    )
 
     day_change_brl: Decimal | None = None
     day_change_pct: Decimal | None = None
@@ -546,6 +573,7 @@ def _build_position(
         market_value=_cents(market_value),
         market_value_brl=_cents(market_value_brl),
         unrealized_pnl=_cents(unrealized),
+        dy_12m_pct=dy_12m_pct,
         day_change_brl=_cents(day_change_brl),
         day_change_pct=(
             day_change_pct.quantize(Decimal("0.000001"))
@@ -558,32 +586,59 @@ def _build_position(
 INCOME_OPS = (Operation.dividend, Operation.jcp, Operation.yield_)
 
 
-def _income_ytd(db: Session, transactions: list[Transaction]) -> Decimal:
-    """Income received since January 1st of the current year, in BRL.
+@dataclass
+class IncomeSummary:
+    ytd_brl: Decimal
+    last_12m_brl: Decimal
+    # Trailing-12m income per (ticker, currency), in the payment's own
+    # currency — the per-position DY numerator (no FX involved).
+    last_12m_by_ticker: dict[tuple[str, str], Decimal]
 
-    USD income (Avenue) converts at the PTAX of each payment's own date —
-    the same get_usd_brl source and per-date convention the contributions
-    endpoint uses — never today's rate. One lookup per distinct date
-    (memoized, None included); a date with no FX available silently
-    excludes that payment from the sum, matching contributions.
+
+def _income_summary(db: Session, transactions: list[Transaction]) -> IncomeSummary:
+    """Income received YTD and in the trailing 12 months, in one pass.
+
+    BRL totals: USD income (Avenue) converts at the PTAX of each payment's
+    own date — the same get_usd_brl source and per-date convention the
+    contributions endpoint uses — never today's rate. One lookup per
+    distinct date (memoized, None included); a date with no FX available
+    silently excludes that payment from the BRL sums, matching
+    contributions. The per-ticker map is kept in the payment's currency,
+    so it never loses rows to missing FX.
     """
-    year_start = date(datetime.now(timezone.utc).year, 1, 1)
+    today = datetime.now(timezone.utc).date()
+    year_start = date(today.year, 1, 1)
+    twelve_months_ago = today - timedelta(days=365)
+    cutoff = min(year_start, twelve_months_ago)
     rates: dict[date, Decimal | None] = {}
-    total = ZERO
+    ytd = ZERO
+    last_12m = ZERO
+    by_ticker: dict[tuple[str, str], Decimal] = {}
     for tx in transactions:
-        if tx.operation not in INCOME_OPS or tx.date < year_start:
+        if tx.operation not in INCOME_OPS or tx.date < cutoff:
             continue
         amount = tx.total_value or ZERO
+        in_12m = tx.date >= twelve_months_ago
+        if in_12m:
+            key = (tx.ticker, tx.currency)
+            by_ticker[key] = by_ticker.get(key, ZERO) + amount
         if tx.currency == "BRL":
-            total += amount
+            brl = amount
         elif tx.currency == "USD":
             if tx.date not in rates:
                 fx = get_usd_brl(db, tx.date)
                 rates[tx.date] = fx.rate if fx is not None else None
             rate = rates[tx.date]
-            if rate is not None:
-                total += amount * rate
-    return total
+            brl = amount * rate if rate is not None else None
+        else:
+            brl = None
+        if brl is None:
+            continue
+        if tx.date >= year_start:
+            ytd += brl
+        if in_12m:
+            last_12m += brl
+    return IncomeSummary(ytd, last_12m, by_ticker)
 
 
 def _to_brl(
