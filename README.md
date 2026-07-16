@@ -1,4 +1,4 @@
-# Investimentos — plataforma pessoal de consolidação de investimentos
+# Lastro — plataforma pessoal de consolidação de investimentos
 
 > **⚠️ Todos os dados exibidos neste repositório (screenshots, banco demo, script de
 > carga) são fictícios e gerados por script.** Nenhuma transação, posição ou valor
@@ -8,8 +8,9 @@
 Aplicação web **pessoal, single-user** que consolida investimentos de três fontes —
 B3 (extrato de Movimentação), Avenue (extrato CSV) e Binance (exports de trade/order
 history) — em um dashboard único: patrimônio consolidado em BRL, seções EUA e cripto
-em USD nativo, renda (dividendos/JCP/rendimentos), TWR contra benchmarks (CDI, IBOV,
-S&P 500, BTC), correlação, CAPM e relatório mensal.
+em USD nativo, renda (dividendos/JCP/rendimentos), dividend yield 12m por posição e
+da carteira, TWR contra benchmarks (CDI, IBOV, S&P 500, BTC), correlação, CAPM e
+relatório mensal.
 
 A ideia central é **automatizar a vida do investidor**: você arrasta o extrato
 exportado da corretora/exchange e a plataforma calcula tudo sozinha — posições, preço
@@ -85,6 +86,21 @@ adicionais, auditáveis.
 
 **Dinheiro nunca é float.** `Decimal` no Python, `NUMERIC` no banco, string no JSON,
 `Intl.NumberFormat('pt-BR')` no frontend.
+
+**Design system próprio, com paleta validada por script.** Identidade "Ledger": dark
+quente (grafite, não o slate azulado default), latão como única cor de marca (botões
+com texto escuro por contraste — 6,8:1), Inter para UI/dados e serifa de display em
+exatamente três papéis (wordmark, número-herói, título de página). Cor é sistêmica
+(`src/lib/colors.ts` é fonte única): a paleta categórica dos gráficos foi **validada
+por script contra daltonismo** (separação protan/deutan ΔE ≥ 8 nos pares adjacentes,
+contraste ≥ 3:1 sobre a superfície) — a ordem das cores é o mecanismo de segurança,
+não estética. Verde/vermelho são reservados à semântica ganho/perda; benchmarks
+tracejados usam a versão clara do matiz da seção que referenciam.
+
+**Dividend yield honesto entre moedas.** DY 12m = renda móvel de 12 meses ÷ valor de
+mercado, **numerador e denominador na moeda nativa da posição** — o percentual vale
+igual na visão BRL e na visão USD. Renda fixa não exibe DY por definição; grupos
+agregam por média ponderada pelo valor de mercado.
 
 **Cripto com custódia explícita.** O motor de posições indexa por `(ticker, custódia)`
 — o mesmo ativo na exchange e em self-custody são posições distintas, movidas por uma
