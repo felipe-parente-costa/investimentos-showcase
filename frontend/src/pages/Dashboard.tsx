@@ -129,6 +129,30 @@ export default function Dashboard() {
                 {loading ? 'Atualizando…' : 'Atualizar'}
               </button>
             </div>
+            {/* Avisos de cálculo: colapsados num chip discreto no topo (F5).
+                Um bloco de alerta permanente no rodapé vira "alarme cego" —
+                os avisos são estáveis/informativos, não incidentes. */}
+            {portfolio.warnings.length > 0 && (
+              <details className="group rounded-xl border border-amber-900/60 bg-amber-950/20">
+                <summary className="cursor-pointer list-none px-4 py-2 text-xs font-medium text-amber-300 [&::-webkit-details-marker]:hidden">
+                  ⚠ {portfolio.warnings.length}{' '}
+                  {portfolio.warnings.length === 1
+                    ? 'aviso do cálculo de posições'
+                    : 'avisos do cálculo de posições'}
+                  <span className="ml-2 font-normal text-amber-300/60 group-open:hidden">
+                    mostrar
+                  </span>
+                  <span className="ml-2 hidden font-normal text-amber-300/60 group-open:inline">
+                    ocultar
+                  </span>
+                </summary>
+                <ul className="list-inside list-disc space-y-1 px-4 pb-3 text-xs text-amber-300/90">
+                  {portfolio.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
             <SummaryCards
               portfolio={portfolio}
               twrIndex={twrIndex}
@@ -180,18 +204,6 @@ export default function Dashboard() {
               groupOf={dashboardGroup}
               groupMeta={DASHBOARD_GROUPS}
             />
-            {portfolio.warnings.length > 0 && (
-              <div className="rounded-xl border border-amber-900/60 bg-amber-950/30 p-4 text-xs text-amber-300">
-                <p className="mb-2 font-medium">
-                  Avisos do cálculo de posições ({portfolio.warnings.length})
-                </p>
-                <ul className="list-inside list-disc space-y-1">
-                  {portfolio.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </>
         )}
     </main>

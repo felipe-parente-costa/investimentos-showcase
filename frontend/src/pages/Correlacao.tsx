@@ -119,7 +119,7 @@ export default function Correlacao() {
   return (
     <main className="mx-auto max-w-6xl space-y-4 p-6">
       <div>
-        <h2 className="text-lg font-semibold">Correlação dos retornos diários</h2>
+        <h2 className="font-display text-lg font-semibold">Correlação dos retornos diários</h2>
         <p className="mt-1 text-sm text-slate-400">
           Coeficiente de Pearson entre os retornos diários dos ativos da carteira, a
           partir das cotações em cache. Verde = movem juntos, vermelho = movem em

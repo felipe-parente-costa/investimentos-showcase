@@ -21,40 +21,75 @@ type Page =
 
 const SEGMENT_PAGES: SegmentKey[] = ['br', 'us', 'crypto', 'rf']
 
-const PAGES: { value: Page; label: string }[] = [
-  { value: 'dashboard', label: 'Dashboard' },
-  { value: 'br', label: 'Brasil' },
-  { value: 'rf', label: 'Renda Fixa' },
-  { value: 'us', label: 'EUA' },
-  { value: 'crypto', label: 'Cripto' },
-  { value: 'mercado', label: 'Mercado' },
-  { value: 'correlacao', label: 'Correlação' },
-  { value: 'relatorios', label: 'Relatórios' },
-  { value: 'lancamentos', label: 'Lançamentos' },
-  { value: 'import', label: 'Importar' },
+// Nav agrupada (F5): visão geral · carteiras · análise · operações.
+// O separador entre grupos reflete a hierarquia real de uso; dentro de
+// cada grupo a ordem é a mesma de antes.
+const NAV_GROUPS: { value: Page; label: string }[][] = [
+  [{ value: 'dashboard', label: 'Visão geral' }],
+  [
+    { value: 'br', label: 'Brasil' },
+    { value: 'rf', label: 'Renda Fixa' },
+    { value: 'us', label: 'EUA' },
+    { value: 'crypto', label: 'Cripto' },
+  ],
+  [
+    { value: 'mercado', label: 'Mercado' },
+    { value: 'correlacao', label: 'Correlação' },
+    { value: 'relatorios', label: 'Relatórios' },
+  ],
+  [
+    { value: 'lancamentos', label: 'Lançamentos' },
+    { value: 'import', label: 'Importar' },
+  ],
 ]
 
 export default function App() {
-  const [page, setPage] = useState<Page>('mercado')
+  // Abre na visão geral (F5): o dashboard é o resumo; Mercado é contexto.
+  const [page, setPage] = useState<Page>('dashboard')
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="flex items-center gap-6 border-b border-slate-800 px-6 py-4">
-        <h1 className="text-xl font-semibold">Investimentos</h1>
-        <nav className="flex gap-1">
-          {PAGES.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setPage(item.value)}
-              className={`rounded-lg px-3 py-1.5 text-sm ${
-                page === item.value
-                  ? 'bg-slate-800 text-slate-100'
-                  : 'text-slate-400 hover:bg-slate-800/60'
-              }`}
-            >
-              {item.label}
-            </button>
+        <h1 className="flex items-center gap-2.5 font-display text-xl font-semibold">
+          {/* Marca "Ledger": camadas em base estável + ponto-patrimônio
+              (mesmo desenho do favicon.svg, sem o tile). */}
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 44 44"
+            aria-hidden="true"
+            className="shrink-0"
+          >
+            <rect x="8" y="30" width="28" height="5" rx="2.5" fill="#d9a84e" />
+            <rect x="12" y="21" width="20" height="5" rx="2.5" fill="#d9a84e" opacity=".78" />
+            <rect x="16" y="12" width="12" height="5" rx="2.5" fill="#d9a84e" opacity=".55" />
+            <circle cx="22" cy="7" r="2.6" fill="#ece7df" />
+          </svg>
+          Lastro
+        </h1>
+        <nav className="flex flex-wrap items-center gap-x-1">
+          {NAV_GROUPS.map((group, index) => (
+            <div key={group[0].value} className="flex items-center gap-x-1">
+              {index > 0 && (
+                <span aria-hidden="true" className="mx-1.5 select-none text-slate-700">
+                  ·
+                </span>
+              )}
+              {group.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setPage(item.value)}
+                  className={`border-b-2 px-2 py-1.5 text-sm transition-colors ${
+                    page === item.value
+                      ? 'border-sky-500 text-slate-100'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
       </header>

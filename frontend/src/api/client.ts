@@ -40,6 +40,10 @@ export interface Position {
   unrealized_pnl: string | null
   day_change_brl: string | null
   day_change_pct: string | null
+  // Trailing-12m income (native currency) and the DY it implies over the
+  // current market value; dy is null for fixed income and unpriced positions.
+  income_12m: string
+  dy_12m_pct: string | null
   // USD view (EUA/Cripto): null for BRL sections.
   usd_average_price: string | null
   usd_total_cost: string | null
@@ -74,6 +78,9 @@ export interface PortfolioResponse {
   day_change_brl: string | null
   day_change_pct: string | null
   income_ytd_brl: string
+  // Trailing-12m income (BRL) and portfolio-level DY over the current total.
+  income_12m_brl: string
+  dy_12m_pct: string | null
   segments: Segment[]
   segment_summaries: SegmentSummary[]
   usd_brl_rate: string | null

@@ -22,6 +22,7 @@ type SortKey =
   | 'quote_price'
   | 'market_value_brl'
   | 'weight'
+  | 'dy_12m'
   | 'unrealized_pnl'
 
 type SortDirection = 'asc' | 'desc'
@@ -42,6 +43,7 @@ const COLUMNS: Column[] = [
   { key: 'quote_price', label: 'Cotação', numeric: true },
   { key: 'market_value_brl', label: 'Valor (R$)', numeric: true },
   { key: 'weight', label: 'Peso', numeric: true },
+  { key: 'dy_12m', label: 'DY 12m', numeric: true },
   { key: 'unrealized_pnl', label: 'P&L aberto', numeric: true },
 ]
 
@@ -75,6 +77,9 @@ function numberValue(p: Position, key: SortKey, total: number): number | null {
       return p.market_value_brl != null && total > 0
         ? (Number(p.market_value_brl) / total) * 100
         : null
+    case 'dy_12m':
+      // Compared in percent so the user can type ">5" meaning >5%.
+      return p.dy_12m_pct != null ? Number(p.dy_12m_pct) * 100 : null
     case 'unrealized_pnl':
       return p.unrealized_pnl != null ? Number(p.unrealized_pnl) : null
     default:
@@ -103,6 +108,19 @@ function consolidate(leaves: Position[]): Position {
   const totalCost = sum((p) => p.total_cost)
   const anyMv = leaves.some((p) => p.market_value_brl != null)
   const anyPnl = leaves.some((p) => p.unrealized_pnl != null)
+  // DY of the aggregate = value-weighted mean of the custody DYs (same
+  // result as income over summed market value, without re-deriving income).
+  const dyLeaves = leaves.filter(
+    (p) => p.dy_12m_pct != null && p.market_value_brl != null,
+  )
+  const dyValue = dyLeaves.reduce((acc, p) => acc + Number(p.market_value_brl), 0)
+  const dy =
+    dyLeaves.length > 0 && dyValue > 0
+      ? dyLeaves.reduce(
+          (acc, p) => acc + Number(p.dy_12m_pct) * Number(p.market_value_brl),
+          0,
+        ) / dyValue
+      : null
   const head = leaves[0]
   return {
     ...head,
@@ -113,6 +131,8 @@ function consolidate(leaves: Position[]): Position {
     average_price: quantity !== 0 ? String(totalCost / quantity) : '0',
     market_value_brl: anyMv ? String(sum((p) => p.market_value_brl)) : null,
     unrealized_pnl: anyPnl ? String(sum((p) => p.unrealized_pnl)) : null,
+    income_12m: String(sum((p) => p.income_12m)),
+    dy_12m_pct: dy != null ? String(dy) : null,
   }
 }
 
@@ -177,6 +197,8 @@ interface Props {
   // Hide the "Classe" column when rendered inside a class/indexer group card
   // (redundant with the group header).
   hideClass?: boolean
+  // Hide the DY column where it never applies (the Renda Fixa view).
+  showDy?: boolean
 }
 
 export default function PositionsTable({
@@ -184,6 +206,7 @@ export default function PositionsTable({
   showIndexer = false,
   valueCurrency = 'BRL',
   hideClass = false,
+  showDy = true,
 }: Props) {
   const valueLabel = valueCurrency === 'USD' ? 'Valor (US$)' : 'Valor (R$)'
   const [sortKey, setSortKey] = useState<SortKey>('market_value_brl')
@@ -195,11 +218,12 @@ export default function PositionsTable({
       COLUMNS.filter(
         (c) =>
           (showIndexer || c.key !== 'indexer') &&
-          (!hideClass || c.key !== 'asset_class'),
+          (!hideClass || c.key !== 'asset_class') &&
+          (showDy || c.key !== 'dy_12m'),
       ).map((c) =>
         c.key === 'market_value_brl' ? { ...c, label: valueLabel } : c,
       ),
-    [showIndexer, valueLabel, hideClass],
+    [showIndexer, valueLabel, hideClass, showDy],
   )
 
   const visibleTotal = useMemo(
@@ -421,6 +445,16 @@ export default function PositionsTable({
                       ? formatPercent(Number(position.market_value_brl) / visibleTotal)
                       : '—'}
                   </td>
+                  {showDy && (
+                    <td
+                      className="px-4 py-3 text-right tabular-nums text-slate-300"
+                      title="Renda dos últimos 12 meses ÷ valor de mercado atual"
+                    >
+                      {position.dy_12m_pct != null
+                        ? formatPercent(Number(position.dy_12m_pct))
+                        : '—'}
+                    </td>
+                  )}
                   <td className={`px-4 py-3 text-right tabular-nums ${pnlColor}`}>
                     {pnl == null ? (
                       '—'

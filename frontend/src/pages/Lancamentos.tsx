@@ -188,7 +188,7 @@ export default function Lancamentos() {
         <button
           type="button"
           onClick={() => setEditing('new')}
-          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-sky-500"
+          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-500"
         >
           Novo lançamento
         </button>

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -49,6 +49,25 @@ function pctColor(value: string | null): string {
 
 function pct(value: string | null): string {
   return value == null ? '—' : formatSignedPercent(Number(value) / 100)
+}
+
+// Y-axis fitted to the data: the wealth series moves a few thousand on a
+// six-digit base, so a 0-anchored axis flattens every month into the same
+// value. Bounds and ticks snap to round thousands (the compact "R$ x mil"
+// tick label has no decimals, so a sub-1000 step would repeat labels),
+// doubling the step until it fits in a few ticks.
+function niceScale(values: number[]): { domain: [number, number]; ticks: number[] } {
+  if (values.length === 0) return { domain: [0, 1], ticks: [] }
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = Math.max(max - min, max / 100, 1)
+  let step = Math.max(1000, 10 ** Math.floor(Math.log10(span)) / 2)
+  const lo = () => Math.max(0, Math.floor((min - step / 2) / step) * step)
+  const hi = () => Math.ceil((max + step / 2) / step) * step
+  while ((hi() - lo()) / step > 8) step *= 2
+  const ticks: number[] = []
+  for (let tick = lo(); tick <= hi(); tick += step) ticks.push(tick)
+  return { domain: [lo(), hi()], ticks }
 }
 
 function dictToSlices(
@@ -114,12 +133,13 @@ export default function Relatorios() {
     month: s.year_month,
     total: Number(s.total_brl),
   }))
+  const evolutionScale = niceScale(evolution.map((e) => e.total))
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Relatórios mensais</h2>
+          <h2 className="font-display text-lg font-semibold">Relatórios mensais</h2>
           <p className="mt-1 text-sm text-slate-400">
             Snapshots congelados da carteira no fim de cada mês.
           </p>
@@ -128,7 +148,7 @@ export default function Relatorios() {
           type="button"
           onClick={generate}
           disabled={generating}
-          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-500 disabled:opacity-50"
         >
           {generating ? 'Gerando…' : 'Gerar relatório do mês atual'}
         </button>
@@ -152,18 +172,20 @@ export default function Relatorios() {
             <p className="mb-4 text-sm text-slate-400">Evolução do patrimônio (mês a mês)</p>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={evolution} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
-                  <CartesianGrid stroke="#1e293b" vertical={false} />
+                <LineChart data={evolution} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+                  <CartesianGrid stroke="#322d27" vertical={false} />
                   <XAxis
                     dataKey="month"
                     tickFormatter={monthLabel}
-                    tick={{ fill: '#64748b', fontSize: 12 }}
-                    axisLine={{ stroke: '#334155' }}
+                    tick={{ fill: '#6e675c', fontSize: 12 }}
+                    axisLine={{ stroke: '#453f36' }}
                     tickLine={false}
                   />
                   <YAxis
+                    domain={evolutionScale.domain}
+                    ticks={evolutionScale.ticks}
                     tickFormatter={(v: number) => compactBRL.format(v)}
-                    tick={{ fill: '#64748b', fontSize: 12 }}
+                    tick={{ fill: '#6e675c', fontSize: 12 }}
                     axisLine={false}
                     tickLine={false}
                     width={72}
@@ -171,16 +193,23 @@ export default function Relatorios() {
                   <Tooltip
                     formatter={(v) => [formatMoney(String(v)), 'Patrimônio']}
                     labelFormatter={(l) => monthLabel(String(l))}
-                    cursor={{ fill: '#1e293b', opacity: 0.4 }}
+                    cursor={{ stroke: '#453f36' }}
                     contentStyle={{
-                      backgroundColor: '#0f172a',
-                      border: '1px solid #334155',
+                      backgroundColor: '#1b1917',
+                      border: '1px solid #453f36',
                       borderRadius: '0.5rem',
-                      color: '#e2e8f0',
+                      color: '#ddd7ca',
                     }}
                   />
-                  <Bar dataKey="total" fill={SECTION_COLORS.total} radius={[3, 3, 0, 0]} />
-                </BarChart>
+                  <Line
+                    type="monotone"
+                    dataKey="total"
+                    stroke={SECTION_COLORS.total}
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: SECTION_COLORS.total, strokeWidth: 0 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>

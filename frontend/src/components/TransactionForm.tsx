@@ -120,7 +120,7 @@ export default function TransactionForm({ initial, onSubmit, onCancel }: Props) 
           onClick={() => setMode(value)}
           className={`rounded-md px-3 py-1 font-medium ${
             mode === value
-              ? 'bg-sky-600 text-white'
+              ? 'bg-sky-600 text-slate-950'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -214,7 +214,7 @@ export default function TransactionForm({ initial, onSubmit, onCancel }: Props) 
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+            className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-500 disabled:opacity-50"
           >
             {saving ? 'Salvando…' : 'Salvar'}
           </button>
@@ -399,7 +399,7 @@ export default function TransactionForm({ initial, onSubmit, onCancel }: Props) 
         <button
           type="submit"
           disabled={saving}
-          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-500 disabled:opacity-50"
         >
           {saving ? 'Salvando…' : 'Salvar'}
         </button>

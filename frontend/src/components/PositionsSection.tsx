@@ -13,6 +13,8 @@ interface Props {
   valueCurrency?: string
   // Show the indexer column in the FLAT view (Renda Fixa).
   showIndexer?: boolean
+  // Hide the DY column where it never applies (Renda Fixa).
+  showDy?: boolean
 }
 
 interface Group {
@@ -20,6 +22,27 @@ interface Group {
   meta: GroupDef
   positions: Position[]
   total: number
+  // Value-weighted DY of the group; null where DY never applies (fixed
+  // income has none by definition, crypto is excluded by product decision),
+  // so those headers show nothing instead of a misleading 0%.
+  dy: number | null
+}
+
+function groupDy(positions: Position[]): number | null {
+  const eligible = positions.filter(
+    (p) =>
+      p.market !== 'crypto' &&
+      p.dy_12m_pct != null &&
+      p.market_value_brl != null,
+  )
+  const value = eligible.reduce((sum, p) => sum + Number(p.market_value_brl), 0)
+  if (value <= 0) return null
+  return (
+    eligible.reduce(
+      (sum, p) => sum + Number(p.dy_12m_pct) * Number(p.market_value_brl),
+      0,
+    ) / value
+  )
 }
 
 function valueOf(p: Position): number {
@@ -32,6 +55,7 @@ export default function PositionsSection({
   groupMeta,
   valueCurrency = 'BRL',
   showIndexer = false,
+  showDy = true,
 }: Props) {
   const [grouped, setGrouped] = useState(true)
 
@@ -52,9 +76,10 @@ export default function PositionsSection({
     return [...byId.entries()]
       .map(([id, ps]) => ({
         id,
-        meta: groupMeta[id] ?? { label: id, color: '#64748b' },
+        meta: groupMeta[id] ?? { label: id, color: '#6e675c' },
         positions: ps,
         total: ps.reduce((sum, p) => sum + valueOf(p), 0),
+        dy: groupDy(ps),
       }))
       .sort((a, b) => b.total - a.total)
   }, [positions, groupOf, groupMeta])
@@ -78,7 +103,7 @@ export default function PositionsSection({
               onClick={() => setGrouped(value === 'grouped')}
               className={`rounded-md px-3 py-1 font-medium ${
                 (value === 'grouped') === grouped
-                  ? 'bg-sky-600 text-white'
+                  ? 'bg-sky-600 text-slate-950'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -96,6 +121,7 @@ export default function PositionsSection({
               group={group}
               sectionTotal={sectionTotal}
               valueCurrency={valueCurrency}
+              showDy={showDy}
             />
           ))}
         </div>
@@ -104,6 +130,7 @@ export default function PositionsSection({
           positions={positions}
           showIndexer={showIndexer}
           valueCurrency={valueCurrency}
+          showDy={showDy}
         />
       )}
     </div>
@@ -114,10 +141,12 @@ function CollapsibleGroup({
   group,
   sectionTotal,
   valueCurrency,
+  showDy,
 }: {
   group: Group
   sectionTotal: number
   valueCurrency: string
+  showDy: boolean
 }) {
   const [open, setOpen] = useState(false)
   const share = sectionTotal > 0 ? group.total / sectionTotal : 0
@@ -149,6 +178,16 @@ function CollapsibleGroup({
           <span className="tabular-nums font-medium text-slate-100">
             {formatMoney(String(group.total), valueCurrency)}
           </span>
+          {/* Fixed-width slot so the values stay column-aligned between
+              groups with and without DY (RF/Cripto render it empty). */}
+          {showDy && (
+            <span
+              className="w-16 text-right text-xs tabular-nums text-slate-500"
+              title="DY 12m do grupo (média ponderada pelo valor)"
+            >
+              {group.dy != null && `DY ${formatPercent(group.dy)}`}
+            </span>
+          )}
         </span>
       </button>
       {open && (
@@ -157,6 +196,7 @@ function CollapsibleGroup({
             positions={group.positions}
             valueCurrency={valueCurrency}
             hideClass
+            showDy={showDy}
           />
         </div>
       )}

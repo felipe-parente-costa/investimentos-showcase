@@ -1,12 +1,62 @@
 @import "tailwindcss";
+/* Fontes self-hosted (F2) — importadas aqui (e não no main.tsx) porque o
+   Vite resolve pacotes em @import de CSS e o tsc não reclama de import de
+   efeito colateral sem declaração de tipos (TS2882). */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/fraunces";
+
+/* Identidade "Ledger" (redesign 2026-07): dark QUENTE — grafite com viés de
+   marrom (livro-razão), tinta off-white quente e latão como única cor de marca.
+   Em vez de renomear classes em ~20 arquivos, as escalas `slate` (neutros) e
+   `sky` (acento) são REDEFINIDAS aqui: todo uso existente muda junto.
+   Verde/vermelho de ganho/perda ficam intocados (semântica reservada). */
+@theme {
+  /* Tipografia (F2): Inter para UI e dados (tabular-nums); Fraunces como
+     serifa de display em EXATAMENTE três papéis — wordmark, número-herói e
+     título de página (utilitário `font-display`). Serifa em mais lugares
+     vira ruído; em menos, não cria assinatura. */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces Variable', Georgia, serif;
+
+  /* Neutros quentes (substituem o slate azulado do Tailwind). */
+  --color-slate-50: #f6f2ea;
+  --color-slate-100: #ece7df; /* tinta primária */
+  --color-slate-200: #ddd7ca;
+  --color-slate-300: #c9c2b3;
+  --color-slate-400: #a49c8e; /* tinta secundária */
+  --color-slate-500: #6e675c; /* tinta apagada */
+  --color-slate-600: #5a5347;
+  --color-slate-700: #453f36; /* bordas fortes / eixos */
+  --color-slate-800: #322d27; /* bordas / pills / grid */
+  --color-slate-900: #1b1917; /* superfície (cards) */
+  --color-slate-950: #14120f; /* fundo */
+
+  /* Latão (marca) substitui o sky. Rampa monotônica: 300 claro → 900 escuro.
+     Botões `bg-sky-600` usam texto ESCURO (text-slate-950): latão + branco
+     não passa de 3:1; latão + tinta-escura dá ~6,8:1. */
+  --color-sky-300: #eacf9b;
+  --color-sky-400: #dfb161; /* links */
+  --color-sky-500: #d9a84e; /* latão-base: bordas ativas, hover de botão */
+  --color-sky-600: #c39440; /* botão primário (com text-slate-950) */
+  --color-sky-900: #594612;
+
+  /* Ganho/perda (F4): mesmos papéis semânticos, recalibrados para o fundo
+     quente — menos fluorescência que green-400/red-400 default. Âmbar de
+     aviso fica no default do Tailwind. */
+  --color-green-400: #3fb968;
+  --color-red-400: #e5484d;
+  --color-emerald-300: #7fd2a0;
+  --color-emerald-400: #55c17e;
+  --color-emerald-500: #3fb968;
+}
 
 /* Typography scale (Fase 1 do redesign): 4 níveis reutilizáveis de tipografia,
    aplicados primeiro no Dashboard e a propagar para as demais telas depois.
    Apenas tamanho/peso — sem cor; combinar com utilitários de cor conforme o uso. */
 @layer components {
   .text-hero {
-    @apply text-5xl font-semibold tracking-tight tabular-nums;
-  } /* ~48px — número herói (patrimônio total) */
+    @apply font-display text-5xl font-semibold tracking-tight tabular-nums;
+  } /* ~48px — número herói (patrimônio total), na serifa de display */
   .text-section {
     @apply text-lg font-semibold;
   } /* ~18px — título de seção/card */

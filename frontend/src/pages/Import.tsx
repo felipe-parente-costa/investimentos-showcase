@@ -182,7 +182,7 @@ export default function Import({ onGoToDashboard }: Props) {
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-6">
       <div>
-        <h2 className="text-lg font-semibold">Importar transações</h2>
+        <h2 className="font-display text-lg font-semibold">Importar transações</h2>
         <p className="mt-1 text-sm text-slate-400">
           Escolha a fonte e envie o arquivo exportado. Reimportar o mesmo arquivo
           não duplica nada.
@@ -277,7 +277,7 @@ export default function Import({ onGoToDashboard }: Props) {
           type="button"
           onClick={submit}
           disabled={!file || status === 'loading'}
-          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-500 disabled:opacity-50"
         >
           {status === 'loading' ? 'Importando…' : 'Importar'}
         </button>
@@ -417,7 +417,7 @@ export default function Import({ onGoToDashboard }: Props) {
             <button
               type="button"
               onClick={onGoToDashboard}
-              className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-sky-500"
+              className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-500"
             >
               Ver carteira atualizada →
             </button>

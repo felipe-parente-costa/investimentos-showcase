@@ -195,20 +195,20 @@ export default function ReturnsChart() {
         {!error && series !== null && activeKeys.length > 0 && (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
-              <CartesianGrid stroke="#1e293b" vertical={false} />
+              <CartesianGrid stroke="#322d27" vertical={false} />
               <XAxis
                 dataKey="date"
                 tickFormatter={(value: string) =>
                   monthFormatter.format(new Date(`${value}T12:00:00`))
                 }
-                tick={{ fill: '#64748b', fontSize: 12 }}
-                axisLine={{ stroke: '#334155' }}
+                tick={{ fill: '#6e675c', fontSize: 12 }}
+                axisLine={{ stroke: '#453f36' }}
                 tickLine={false}
                 minTickGap={48}
               />
               <YAxis
                 tickFormatter={(value: number) => `${value.toFixed(0)}%`}
-                tick={{ fill: '#64748b', fontSize: 12 }}
+                tick={{ fill: '#6e675c', fontSize: 12 }}
                 axisLine={false}
                 tickLine={false}
                 width={48}
@@ -222,10 +222,10 @@ export default function ReturnsChart() {
                   dayFormatter.format(new Date(`${String(label)}T12:00:00`))
                 }
                 contentStyle={{
-                  backgroundColor: '#0f172a',
-                  border: '1px solid #334155',
+                  backgroundColor: '#1b1917',
+                  border: '1px solid #453f36',
                   borderRadius: '0.5rem',
-                  color: '#e2e8f0',
+                  color: '#ddd7ca',
                 }}
               />
               <Legend

@@ -1,5 +1,5 @@
 import type { PortfolioResponse } from '../api/client'
-import { formatMoney, formatSignedPercent } from '../lib/format'
+import { formatMoney, formatPercent, formatSignedPercent } from '../lib/format'
 
 export interface MonthChange {
   brl: number
@@ -55,8 +55,8 @@ export default function SummaryCards({ portfolio, twrIndex, monthChange }: Props
       </div>
 
       {/* Métricas secundárias: peso menor que o herói. Largura limitada para o
-          trio não esticar com vazio à direita dos números. */}
-      <div className="grid grid-cols-3 gap-6 sm:max-w-2xl">
+          quarteto não esticar com vazio à direita dos números. */}
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 sm:max-w-3xl">
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
           <p className="text-caption text-slate-400">Rentabilidade total (TWR)</p>
           {twrTotal == null ? (
@@ -99,6 +99,21 @@ export default function SummaryCards({ portfolio, twrIndex, monthChange }: Props
           </p>
           <p className="mt-1 text-caption text-slate-500">
             dividendos, JCP e rendimentos
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <p className="text-caption text-slate-400">DY da carteira (12m)</p>
+          <p
+            className="mt-1 text-xl font-semibold tabular-nums text-green-400"
+            title="Renda dos últimos 12 meses ÷ patrimônio atual"
+          >
+            {portfolio.dy_12m_pct != null
+              ? formatPercent(Number(portfolio.dy_12m_pct))
+              : '—'}
+          </p>
+          <p className="mt-1 text-caption text-slate-500">
+            {formatMoney(portfolio.income_12m_brl)} em 12 meses
           </p>
         </div>
       </div>

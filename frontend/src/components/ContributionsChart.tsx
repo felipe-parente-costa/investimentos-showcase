@@ -28,9 +28,22 @@ function monthLabel(value: string): string {
   return monthFormatter.format(new Date(`${value}-15T12:00:00`))
 }
 
+type SeriesKey = 'aportes' | 'rendimentos'
+
 export default function ContributionsChart() {
   const [months, setMonths] = useState<ContributionMonth[] | null>(null)
   const [error, setError] = useState(false)
+  // Clicking a legend item toggles its series. A hidden Bar (hide) is
+  // excluded from the Y-axis domain, so the scale re-fits what remains.
+  const [hidden, setHidden] = useState<Record<SeriesKey, boolean>>({
+    aportes: false,
+    rendimentos: false,
+  })
+
+  function toggleSeries(key: unknown) {
+    if (key !== 'aportes' && key !== 'rendimentos') return
+    setHidden((current) => ({ ...current, [key]: !current[key] }))
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -73,18 +86,18 @@ export default function ContributionsChart() {
         {!error && months !== null && (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
-              <CartesianGrid stroke="#1e293b" vertical={false} />
+              <CartesianGrid stroke="#322d27" vertical={false} />
               <XAxis
                 dataKey="month"
                 tickFormatter={monthLabel}
-                tick={{ fill: '#64748b', fontSize: 12 }}
-                axisLine={{ stroke: '#334155' }}
+                tick={{ fill: '#6e675c', fontSize: 12 }}
+                axisLine={{ stroke: '#453f36' }}
                 tickLine={false}
                 minTickGap={24}
               />
               <YAxis
                 tickFormatter={(value: number) => compactBRL.format(value)}
-                tick={{ fill: '#64748b', fontSize: 12 }}
+                tick={{ fill: '#6e675c', fontSize: 12 }}
                 axisLine={false}
                 tickLine={false}
                 width={72}
@@ -92,29 +105,52 @@ export default function ContributionsChart() {
               <Tooltip
                 formatter={(value, name) => [formatMoney(String(value)), String(name)]}
                 labelFormatter={(label) => monthLabel(String(label))}
-                cursor={{ fill: '#1e293b', opacity: 0.4 }}
+                cursor={{ fill: '#322d27', opacity: 0.4 }}
                 contentStyle={{
-                  backgroundColor: '#0f172a',
-                  border: '1px solid #334155',
+                  backgroundColor: '#1b1917',
+                  border: '1px solid #453f36',
                   borderRadius: '0.5rem',
-                  color: '#e2e8f0',
+                  color: '#ddd7ca',
                 }}
               />
               <Legend
-                formatter={(value: string) => (
-                  <span className="text-xs text-slate-300">{value}</span>
-                )}
+                onClick={(item) => toggleSeries(item.dataKey)}
+                wrapperStyle={{ cursor: 'pointer' }}
+                formatter={(value: string, entry) => {
+                  const key = (entry as { dataKey?: unknown }).dataKey
+                  const off = key === 'aportes' || key === 'rendimentos'
+                    ? hidden[key]
+                    : false
+                  return (
+                    <span
+                      title="Clique para exibir/ocultar a série"
+                      className={`text-xs ${
+                        off ? 'text-slate-600 line-through' : 'text-slate-300'
+                      }`}
+                    >
+                      {value}
+                    </span>
+                  )
+                }}
               />
               {/* Par de contraste LOCAL (aporte vs rendimento), não identidade
-                  de seção nem categoria — usa dois neutros (slate claro + teal
+                  de seção nem categoria — usa dois neutros (cinza quente + teal
                   apagado) que não pertencem a nenhum mapa central, evitando
                   carregar significado de seção/categoria. */}
-              <Bar dataKey="aportes" name="Aportes" stackId="mes" fill="#94a3b8" />
+              <Bar
+                dataKey="aportes"
+                name="Aportes"
+                stackId="mes"
+                fill="#a49c8e"
+                hide={hidden.aportes}
+                radius={hidden.rendimentos ? [3, 3, 0, 0] : undefined}
+              />
               <Bar
                 dataKey="rendimentos"
                 name="Rendimentos"
                 stackId="mes"
-                fill="#14b8a6"
+                fill="#3aa88d"
+                hide={hidden.rendimentos}
                 radius={[3, 3, 0, 0]}
               />
             </BarChart>

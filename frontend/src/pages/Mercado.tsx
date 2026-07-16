@@ -46,7 +46,7 @@ function fmtDate(value: string | null): string {
 
 // F&G canonical scale (alternative.me): fear = red … greed = green.
 function fngColor(value: number | null): string {
-  if (value == null) return '#64748b'
+  if (value == null) return '#6e675c'
   if (value < 25) return '#ef4444'
   if (value < 50) return '#f97316'
   if (value < 75) return '#a3e635'
@@ -418,7 +418,7 @@ export default function Mercado() {
     <main className="mx-auto max-w-6xl space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Mercado</h2>
+          <h2 className="font-display text-xl font-semibold">Mercado</h2>
           <p className="text-xs text-slate-500">
             Indicadores externos de contexto — não são recomendação nem sinal de
             compra/venda.

@@ -222,7 +222,7 @@ export default function Segmento({ segment }: Props) {
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-6">
       <div className="flex flex-wrap items-baseline gap-3">
-        <h2 className="text-xl font-semibold">{config.title}</h2>
+        <h2 className="font-display text-xl font-semibold">{config.title}</h2>
         {isUsd && (
           <span
             title="Esta seção é exibida em dólar; o patrimônio total e a seção Brasil seguem em reais."
@@ -473,6 +473,7 @@ export default function Segmento({ segment }: Props) {
               groupMeta={GROUPING[segment].groupMeta}
               valueCurrency={sectionCurrency}
               showIndexer={segment === 'rf'}
+              showDy={segment !== 'rf'}
             />
           )}
 
