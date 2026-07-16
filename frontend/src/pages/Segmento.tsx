@@ -444,8 +444,9 @@ export default function Segmento({ segment }: Props) {
           {segment === 'us' && <CapmSection segmentKeys={['us']} />}
           {segment === 'crypto' && (
             <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-xs text-slate-400">
-              Alfa e beta não são exibidos para Cripto: a carteira é majoritariamente
-              BTC, então o beta ≈ 1 é trivial e pouco informativo.
+              Alfa e beta não são exibidos para Cripto: contra o próprio mercado
+              cripto o beta diz pouco. A comparação relevante é a rentabilidade vs.
+              BTC no gráfico abaixo.
             </div>
           )}
           {segment === 'rf' && (
