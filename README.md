@@ -50,6 +50,11 @@ ajustes e correções auditáveis.
 
 ![Importar](docs/screenshots/importar.png)
 
+**Modo claro "Papel"** — toggle no header, tokens próprios calibrados para a nova
+superfície (não um espelho mecânico do escuro), paleta de dados revalidada por script.
+
+![Papel](docs/screenshots/papel.png)
+
 ## Decisões técnicas de destaque
 
 **Reconciliador de empréstimo de ativos B3.** O extrato de Movimentação da B3 mistura
@@ -87,15 +92,22 @@ adicionais, auditáveis.
 **Dinheiro nunca é float.** `Decimal` no Python, `NUMERIC` no banco, string no JSON,
 `Intl.NumberFormat('pt-BR')` no frontend.
 
-**Design system próprio, com paleta validada por script.** Identidade "Ledger": dark
-quente (grafite, não o slate azulado default), latão como única cor de marca (botões
-com texto escuro por contraste — 6,8:1), Inter para UI/dados e serifa de display em
-exatamente três papéis (wordmark, número-herói, título de página). Cor é sistêmica
-(`src/lib/colors.ts` é fonte única): a paleta categórica dos gráficos foi **validada
-por script contra daltonismo** (separação protan/deutan ΔE ≥ 8 nos pares adjacentes,
-contraste ≥ 3:1 sobre a superfície) — a ordem das cores é o mecanismo de segurança,
-não estética. Verde/vermelho são reservados à semântica ganho/perda; benchmarks
-tracejados usam a versão clara do matiz da seção que referenciam.
+**Design system próprio, com paleta validada por script — em dois temas.** Identidade
+"Ledger": dark quente (grafite, não o slate azulado default), latão como única cor de
+marca (botões com texto escuro por contraste — 6,8:1), Inter para UI/dados e serifa de
+display em exatamente três papéis (wordmark, número-herói, título de página). Cor é
+sistêmica (`src/lib/colors.ts` é fonte única): a paleta categórica dos gráficos foi
+**validada por script contra daltonismo** (separação protan/deutan ΔE ≥ 8 nos pares
+adjacentes, contraste ≥ 3:1 sobre a superfície) — a ordem das cores é o mecanismo de
+segurança, não estética. Verde/vermelho são reservados à semântica ganho/perda;
+benchmarks tracejados usam a versão clara do matiz da seção que referenciam. O modo
+claro "Papel" (toggle no header) **não é um espelho automático do escuro**: cada token
+de texto/borda foi calibrado contra a nova superfície com a mesma tolerância de
+contraste por papel que o escuro já usava, e a paleta categórica foi revalidada pelo
+mesmo script contra o novo fundo (dois matizes precisaram escurecer para manter
+contraste ≥ 3:1; os outros passaram sem ajuste). Os tokens compilam para CSS custom
+properties reais (Tailwind v4) — a troca de tema não exige nenhuma mudança nos
+componentes que os consomem.
 
 **Dividend yield honesto entre moedas.** DY 12m = renda móvel de 12 meses ÷ valor de
 mercado, **numerador e denominador na moeda nativa da posição** — o percentual vale
@@ -115,6 +127,14 @@ uma regra editorial estrita: sem rótulo de compra/venda, sem "barato/caro" — 
 semântica só nas setas de variação. Cada fonte tem cache próprio e falha de forma
 independente (mostra "—" sem derrubar a seção), com a fonte e a data sempre visíveis
 no rodapé de cada card.
+
+**Lista de posições: mesmo agrupador, dados ao vivo e históricos.** Cada cabeçalho de
+grupo (Ações, FIIs, Renda Fixa por indexador...) mostra uma sparkline da tendência do
+grupo nos últimos meses de snapshot — usando exatamente a mesma função de agrupamento
+da visão ao vivo, aplicada aos dados históricos congelados (a assinatura foi estreitada
+para o subconjunto de campos comum a ambos os formatos, sem duplicar lógica). Avatares
+de ticker coloridos pela classe do ativo, cabeçalho fixo na lista plana e relatório
+mensal com uma frase-resumo gerada dos dados já exibidos completam o conjunto.
 
 **Correlação e CAPM sobre as cotações em cache.** Matriz de Pearson dos retornos
 diários da carteira (com seleção de ativos e um recorte automático das 10 maiores

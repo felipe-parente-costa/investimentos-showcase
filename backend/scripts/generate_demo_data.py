@@ -108,7 +108,7 @@ CRYPTO = [
 ]
 
 BR_BROKER = "Corretora Demo"
-US_BROKER = "Corretora Demo US"
+US_BROKER = "Broker Demo International"
 EXCHANGE = "Exchange Demo"
 
 
