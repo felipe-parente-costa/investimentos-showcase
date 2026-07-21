@@ -550,6 +550,8 @@ export interface SnapshotPosition {
   asset_class: AssetClass
   market: Market
   institution: string | null
+  custody: string | null
+  indexer: Indexer | null
   currency: string
   quantity: string
   average_price: string

@@ -11,6 +11,7 @@ import {
   type MoversFilter,
   type MoversResponse,
 } from '../api/client'
+import { SkeletonCard } from '../components/Skeleton'
 
 // Indicators here are CONTEXT, not signals: no buy/sell arrows, no alerts, no
 // "cheap/expensive". Only numbers, the source's own textual class (F&G), and
@@ -46,7 +47,7 @@ function fmtDate(value: string | null): string {
 
 // F&G canonical scale (alternative.me): fear = red … greed = green.
 function fngColor(value: number | null): string {
-  if (value == null) return '#6e675c'
+  if (value == null) return 'var(--color-slate-500)'
   if (value < 25) return '#ef4444'
   if (value < 50) return '#f97316'
   if (value < 75) return '#a3e635'
@@ -440,7 +441,17 @@ export default function Mercado() {
           Não foi possível carregar os indicadores.
         </div>
       )}
-      {!error && !data && <p className="text-slate-400">Carregando…</p>}
+      {!error && !data && (
+        <div className="space-y-8">
+          {[0, 1, 2].map((block) => (
+            <div key={block} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ))}
+        </div>
+      )}
 
       {data && (
         <div className="space-y-8">

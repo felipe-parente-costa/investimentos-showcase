@@ -1,4 +1,4 @@
-import type { Position } from '../api/client'
+import type { AssetClass, Indexer, Market } from '../api/client'
 import {
   CLASS_COLORS,
   INDEXER_COLORS,
@@ -10,6 +10,16 @@ export interface GroupDef {
   color: string
 }
 
+// The subset of Position/SnapshotPosition fields grouping needs — narrow on
+// purpose so the same groupOf functions work for live positions AND for
+// historical snapshot positions (used by the group sparkline), which don't
+// carry every Position field.
+export interface Groupable {
+  asset_class: AssetClass
+  market: Market
+  indexer?: Indexer | null
+}
+
 // Swatches da lista de posições importam do MESMO mapa central de categoria
 // usado pelos donuts — nunca uma cor própria. Cripto na lista = mesmo magenta
 // que Cripto no donut, etc.
@@ -17,7 +27,7 @@ const UNKNOWN: GroupDef = { label: 'Sem classificação', color: OTHERS_COLOR }
 
 // Dashboard: asset_class + region (market). Stock BR and stock US must not
 // share a group, so the region (a real field) splits them.
-export function dashboardGroup(p: Position): string {
+export function dashboardGroup(p: Groupable): string {
   if (p.asset_class === 'fixed_income') return 'rf'
   if (p.market === 'crypto') return 'crypto'
   if (p.market === 'br' && p.asset_class === 'stock') return 'br_stock'
@@ -38,7 +48,7 @@ export const DASHBOARD_GROUPS: Record<string, GroupDef> = {
 }
 
 // Brasil page: asset_class only (single region).
-export function brasilGroup(p: Position): string {
+export function brasilGroup(p: Groupable): string {
   if (p.asset_class === 'stock') return 'stock'
   if (p.asset_class === 'fii') return 'fii'
   if (p.asset_class === 'etf') return 'etf'
@@ -53,7 +63,7 @@ export const BRASIL_GROUPS: Record<string, GroupDef> = {
 }
 
 // EUA page: asset_class (Stocks vs ETFs).
-export function euaGroup(p: Position): string {
+export function euaGroup(p: Groupable): string {
   if (p.asset_class === 'stock') return 'stock'
   if (p.asset_class === 'etf') return 'etf'
   return 'unknown'
@@ -66,7 +76,7 @@ export const EUA_GROUPS: Record<string, GroupDef> = {
 }
 
 // Renda Fixa page: indexer.
-export function rfGroup(p: Position): string {
+export function rfGroup(p: Groupable): string {
   return p.indexer ?? 'unknown'
 }
 

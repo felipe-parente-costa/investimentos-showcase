@@ -56,6 +56,41 @@ export default function AllocationDonut({
   const total = data.reduce((sum, slice) => sum + slice.value, 0)
   const pct = (value: number) => formatPercent(total > 0 ? value / total : 0)
 
+  // Direct label for the two largest slices only (data is already sorted
+  // desc, "Outros" appended last) — the rest stay legend/tooltip-only so the
+  // donut doesn't turn into a wall of tiny text. Percent only (not the
+  // category name): the cards are narrow in a 3-column grid, and a long
+  // label like "Renda fixa"/"Estados Unidos" on the left side clips against
+  // the card edge — the name is one glance away in the legend below.
+  const RADIAN = Math.PI / 180
+  const renderDirectLabel = (props: {
+    cx: number
+    cy: number
+    midAngle: number
+    outerRadius: number
+    index: number
+    payload: DonutSlice
+  }) => {
+    const { cx, cy, midAngle, outerRadius, index, payload } = props
+    if (index > 1) return null
+    const radius = outerRadius + 12
+    const x = cx + radius * Math.cos(-midAngle * RADIAN)
+    const y = cy + radius * Math.sin(-midAngle * RADIAN)
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="var(--color-slate-100)"
+        fontSize={11}
+        fontWeight={600}
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+      >
+        {pct(payload.value)}
+      </text>
+    )
+  }
+
   const renderTooltip = ({
     active,
     payload,
@@ -125,10 +160,12 @@ export default function AllocationDonut({
               outerRadius="80%"
               paddingAngle={2}
               stroke="none"
+              label={renderDirectLabel}
+              labelLine={false}
             >
               {data.map((slice, index) => (
                 <Cell
-                  key={slice.label}
+                  key={index}
                   fill={slice.color ?? DONUT_PALETTE[index % DONUT_PALETTE.length]}
                 />
               ))}

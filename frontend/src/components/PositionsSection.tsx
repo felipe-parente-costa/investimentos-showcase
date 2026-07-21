@@ -1,13 +1,22 @@
-import { useMemo, useState } from 'react'
-import type { Position } from '../api/client'
-import type { GroupDef } from '../lib/grouping'
+import { useEffect, useMemo, useState } from 'react'
+import { getMonthlyReport, getMonthlyReports, type Position } from '../api/client'
+import type { GroupDef, Groupable } from '../lib/grouping'
 import { formatMoney, formatPercent } from '../lib/format'
 import PositionsTable from './PositionsTable'
+import Sparkline from './Sparkline'
+
+// How many of the most recent monthly snapshots feed the group trend line.
+// The app only has a few months of real history today; fewer points than
+// this just means a shorter (still honest) line, not a bug.
+const SPARKLINE_MONTHS = 6
 
 interface Props {
   positions: Position[]
   // Maps a position to its group id; groupMeta provides label/color per id.
-  groupOf: (p: Position) => string
+  // Takes the narrow Groupable shape (not the full live Position) so the
+  // same function also groups historical SnapshotPosition rows for the
+  // sparkline below.
+  groupOf: (p: Groupable) => string
   groupMeta: Record<string, GroupDef>
   // Currency of the value column / headers (BRL default; USD for EUA).
   valueCurrency?: string
@@ -58,6 +67,45 @@ export default function PositionsSection({
   showDy = true,
 }: Props) {
   const [grouped, setGrouped] = useState(true)
+  const [sparklines, setSparklines] = useState<Record<string, number[]>>({})
+
+  // Group value trend over the last few monthly snapshots — fetched once
+  // per mount, independent of the live `positions` prop. Historical
+  // SnapshotPosition rows carry the same asset_class/market/indexer fields
+  // groupOf needs, so the exact same grouping used for the live view also
+  // buckets the past months (Groupable is the common subset).
+  useEffect(() => {
+    let cancelled = false
+    getMonthlyReports()
+      .then((list) => {
+        const months = list.items.slice(-SPARKLINE_MONTHS).map((s) => s.year_month)
+        return Promise.all(months.map((ym) => getMonthlyReport(ym)))
+      })
+      .then((details) => {
+        if (cancelled) return
+        const ids = new Set<string>()
+        const perMonth = details.map((detail) => {
+          const totals: Record<string, number> = {}
+          for (const p of detail.positions) {
+            const id = groupOf(p)
+            totals[id] = (totals[id] ?? 0) + Number(p.market_value_brl)
+            ids.add(id)
+          }
+          return totals
+        })
+        const byGroup: Record<string, number[]> = {}
+        for (const id of ids) {
+          byGroup[id] = perMonth.map((totals) => totals[id] ?? 0)
+        }
+        setSparklines(byGroup)
+      })
+      .catch(() => {
+        if (!cancelled) setSparklines({})
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [groupOf])
 
   const sectionTotal = useMemo(
     () => positions.reduce((sum, p) => sum + valueOf(p), 0),
@@ -76,7 +124,7 @@ export default function PositionsSection({
     return [...byId.entries()]
       .map(([id, ps]) => ({
         id,
-        meta: groupMeta[id] ?? { label: id, color: '#6e675c' },
+        meta: groupMeta[id] ?? { label: id, color: 'var(--color-slate-500)' },
         positions: ps,
         total: ps.reduce((sum, p) => sum + valueOf(p), 0),
         dy: groupDy(ps),
@@ -103,7 +151,7 @@ export default function PositionsSection({
               onClick={() => setGrouped(value === 'grouped')}
               className={`rounded-md px-3 py-1 font-medium ${
                 (value === 'grouped') === grouped
-                  ? 'bg-sky-600 text-slate-950'
+                  ? 'bg-sky-600 text-inkbrass'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -122,6 +170,7 @@ export default function PositionsSection({
               sectionTotal={sectionTotal}
               valueCurrency={valueCurrency}
               showDy={showDy}
+              sparkline={sparklines[group.id]}
             />
           ))}
         </div>
@@ -131,6 +180,7 @@ export default function PositionsSection({
           showIndexer={showIndexer}
           valueCurrency={valueCurrency}
           showDy={showDy}
+          stickyHeader
         />
       )}
     </div>
@@ -142,11 +192,13 @@ function CollapsibleGroup({
   sectionTotal,
   valueCurrency,
   showDy,
+  sparkline,
 }: {
   group: Group
   sectionTotal: number
   valueCurrency: string
   showDy: boolean
+  sparkline?: number[]
 }) {
   const [open, setOpen] = useState(false)
   const share = sectionTotal > 0 ? group.total / sectionTotal : 0
@@ -168,6 +220,14 @@ function CollapsibleGroup({
           {group.positions.length} {group.positions.length === 1 ? 'ativo' : 'ativos'}
         </span>
         <span className="ml-auto flex items-center gap-3">
+          {sparkline && sparkline.length >= 2 && (
+            <span
+              className="hidden sm:block"
+              title={`Patrimônio do grupo nos últimos ${sparkline.length} meses`}
+            >
+              <Sparkline values={sparkline} color={group.meta.color} />
+            </span>
+          )}
           <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-slate-800 sm:block">
             <span
               className="block h-full rounded-full"

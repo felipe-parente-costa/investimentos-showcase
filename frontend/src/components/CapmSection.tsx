@@ -6,6 +6,7 @@ import {
   type CapmSegment,
 } from '../api/client'
 import { formatSignedPercent } from '../lib/format'
+import { Skeleton } from './Skeleton'
 
 const PERIODS: CapmPeriod[] = ['6M', '1A', '2A', 'MAX']
 const PERIOD_LABELS: Record<CapmPeriod, string> = {
@@ -156,7 +157,18 @@ export default function CapmSection({ segmentKeys }: Props) {
         <p className="text-sm text-slate-500">Não foi possível carregar as métricas CAPM.</p>
       )}
       {!error && data === null && (
-        <p className="text-sm text-slate-500">Carregando métricas…</p>
+        <div className="grid grid-cols-1 gap-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+              <Skeleton className="h-4 w-40" />
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
       {!error && data !== null && (
         <div className="grid grid-cols-1 gap-4">

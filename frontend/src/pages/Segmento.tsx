@@ -6,6 +6,7 @@ import PositionsTable from '../components/PositionsTable'
 import PositionsSection from '../components/PositionsSection'
 import SegmentReturnsChart from '../components/SegmentReturnsChart'
 import UsdBrlMarketCard from '../components/UsdBrlMarketCard'
+import { SkeletonCard, SkeletonChart, SkeletonRows } from '../components/Skeleton'
 import {
   type GroupDef,
   brasilGroup,
@@ -240,7 +241,21 @@ export default function Segmento({ segment }: Props) {
           {error}
         </div>
       )}
-      {!error && !portfolio && <p className="text-slate-400">Carregando…</p>}
+      {!error && !portfolio && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <div className="h-72">
+              <SkeletonChart />
+            </div>
+          </div>
+          <SkeletonRows />
+        </div>
+      )}
       {portfolio && positions.length === 0 && (
         <p className="text-slate-400">Nenhuma posição aberta neste segmento.</p>
       )}

@@ -16,6 +16,7 @@ import SegmentTabs, { type SegmentFilter } from '../components/SegmentTabs'
 import SummaryCards, { type MonthChange } from '../components/SummaryCards'
 import { ASSET_CLASS_LABELS } from '../lib/format'
 import { classColor, CURRENCY_COLORS } from '../lib/colors'
+import { SkeletonCard, SkeletonChart, SkeletonRows } from '../components/Skeleton'
 
 const REFRESH_MS = 5 * 60 * 1000
 
@@ -103,7 +104,20 @@ export default function Dashboard() {
           </div>
         )}
         {!error && !portfolio && (
-          <p className="text-slate-400">Carregando portfólio…</p>
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 sm:max-w-3xl">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+              <div className="h-72">
+                <SkeletonChart />
+              </div>
+            </div>
+            <SkeletonRows />
+          </div>
         )}
         {portfolio && portfolio.positions.length === 0 && (
           <p className="text-slate-400">

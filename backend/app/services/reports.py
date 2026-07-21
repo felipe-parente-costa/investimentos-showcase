@@ -25,6 +25,7 @@ from app.models.quote import Quote
 from app.models.transaction import Transaction
 from app.services.fx import FxResult, get_usd_brl
 from app.services.history import build_patrimony_history
+from app.services.indexer import resolve_indexer
 from app.services.portfolio import compute_positions
 
 ZERO = Decimal("0")
@@ -140,6 +141,13 @@ def build_snapshot_data(db: Session, as_of: date) -> SnapshotData | None:
                 "market": position.market.value,
                 "institution": position.institution,
                 "custody": position.custody.value if position.custody else None,
+                "indexer": (
+                    resolve_indexer(
+                        position.ticker, position.asset_name, position.indexer
+                    ).value
+                    if position.asset_class is AssetClass.fixed_income
+                    else None
+                ),
                 "currency": position.currency,
                 "quantity": _num(position.quantity),
                 "average_price": _num(position.average_price),

@@ -11,6 +11,14 @@ import {
   formatSignedPercent,
   prettifyInstitution,
 } from '../lib/format'
+import { classColor } from '../lib/colors'
+
+// First two letters of the ticker, uppercased (non-letters stripped so a BR
+// suffix digit like PETR4 doesn't shift the pick — "PE", not "P4").
+function initials(ticker: string): string {
+  const letters = ticker.replace(/[^A-Za-zÀ-ÿ]/g, '')
+  return (letters.slice(0, 2) || ticker.slice(0, 2)).toUpperCase()
+}
 
 type SortKey =
   | 'ticker'
@@ -199,6 +207,11 @@ interface Props {
   hideClass?: boolean
   // Hide the DY column where it never applies (the Renda Fixa view).
   showDy?: boolean
+  // Pin the header (labels + filters) to the top of the viewport while
+  // scrolling — only makes sense for the standalone flat list; the nested
+  // table inside a collapsible group stays static (it would stick to the
+  // viewport top detached from its own short, already-visible card).
+  stickyHeader?: boolean
 }
 
 export default function PositionsTable({
@@ -207,6 +220,7 @@ export default function PositionsTable({
   valueCurrency = 'BRL',
   hideClass = false,
   showDy = true,
+  stickyHeader = false,
 }: Props) {
   const valueLabel = valueCurrency === 'USD' ? 'Valor (US$)' : 'Valor (R$)'
   const [sortKey, setSortKey] = useState<SortKey>('market_value_brl')
@@ -318,10 +332,14 @@ export default function PositionsTable({
           </button>
         )}
       </div>
-      <div className="overflow-x-auto">
+      <div className={`overflow-x-auto ${stickyHeader ? 'max-h-[70vh] overflow-y-auto' : ''}`}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-400">
+            <tr
+              className={`border-b border-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-400 ${
+                stickyHeader ? 'sticky top-0 z-10 bg-slate-900' : ''
+              }`}
+            >
               {columns.map((column) => (
                 <th key={column.key} className={column.numeric ? 'text-right' : ''}>
                   <button
@@ -372,32 +390,46 @@ export default function PositionsTable({
                   } ${kind === 'child' ? 'text-slate-400' : ''}`}
                 >
                   <td className={`px-4 py-3 ${kind === 'child' ? 'pl-8' : ''}`}>
-                    <span className="font-medium">{position.ticker}</span>
-                    {kind === 'parent' && (
+                    <div className="flex items-center gap-2.5">
                       <span
-                        title="Soma de todas as custódias"
-                        className="ml-2 rounded bg-slate-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300"
+                        aria-hidden="true"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+                        style={{
+                          backgroundColor: `${classColor(position.asset_class, position.market)}26`,
+                          color: classColor(position.asset_class, position.market),
+                        }}
                       >
-                        Total
+                        {initials(position.ticker)}
                       </span>
-                    )}
-                    {position.custody && (
-                      <span
-                        title={CUSTODY_LABELS[position.custody]}
-                        className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                          position.custody === 'cold_wallet'
-                            ? 'bg-sky-500/15 text-sky-300'
-                            : 'bg-amber-500/15 text-amber-300'
-                        }`}
-                      >
-                        {CUSTODY_SHORT_LABELS[position.custody]}
-                      </span>
-                    )}
-                    {kind !== 'child' && position.asset_name && (
-                      <span className="mt-0.5 block max-w-56 truncate text-xs text-slate-500">
-                        {position.asset_name}
-                      </span>
-                    )}
+                      <div className="min-w-0">
+                        <span className="font-medium">{position.ticker}</span>
+                        {kind === 'parent' && (
+                          <span
+                            title="Soma de todas as custódias"
+                            className="ml-2 rounded bg-slate-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300"
+                          >
+                            Total
+                          </span>
+                        )}
+                        {position.custody && (
+                          <span
+                            title={CUSTODY_LABELS[position.custody]}
+                            className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                              position.custody === 'cold_wallet'
+                                ? 'bg-sky-500/15 text-sky-300'
+                                : 'bg-amber-500/15 text-amber-300'
+                            }`}
+                          >
+                            {CUSTODY_SHORT_LABELS[position.custody]}
+                          </span>
+                        )}
+                        {kind !== 'child' && position.asset_name && (
+                          <span className="mt-0.5 block max-w-56 truncate text-xs text-slate-500">
+                            {position.asset_name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   {!hideClass && (
                     <td className="px-4 py-3 text-slate-300">

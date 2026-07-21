@@ -19,6 +19,8 @@ class SnapshotPositionOut(BaseModel):
     asset_class: str
     market: str
     institution: str | None
+    custody: str | None
+    indexer: str | None = None
     currency: str
     quantity: Decimal
     average_price: Decimal
