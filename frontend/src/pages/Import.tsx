@@ -277,7 +277,7 @@ export default function Import({ onGoToDashboard }: Props) {
           type="button"
           onClick={submit}
           disabled={!file || status === 'loading'}
-          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-500 disabled:opacity-50"
+          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-inkbrass hover:bg-sky-500 disabled:opacity-50"
         >
           {status === 'loading' ? 'Importando…' : 'Importar'}
         </button>
@@ -417,7 +417,7 @@ export default function Import({ onGoToDashboard }: Props) {
             <button
               type="button"
               onClick={onGoToDashboard}
-              className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-500"
+              className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-inkbrass hover:bg-sky-500"
             >
               Ver carteira atualizada →
             </button>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Correlacao from './pages/Correlacao'
 import Dashboard from './pages/Dashboard'
 import Import from './pages/Import'
@@ -6,6 +6,7 @@ import Lancamentos from './pages/Lancamentos'
 import Mercado from './pages/Mercado'
 import Relatorios from './pages/Relatorios'
 import Segmento, { type SegmentKey } from './pages/Segmento'
+import { applyTheme, getStoredTheme, type Theme } from './lib/theme'
 
 type Page =
   | 'dashboard'
@@ -46,6 +47,11 @@ const NAV_GROUPS: { value: Page; label: string }[][] = [
 export default function App() {
   // Abre na visão geral (F5): o dashboard é o resumo; Mercado é contexto.
   const [page, setPage] = useState<Page>('dashboard')
+  const [theme, setTheme] = useState<Theme>(getStoredTheme)
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -60,10 +66,10 @@ export default function App() {
             aria-hidden="true"
             className="shrink-0"
           >
-            <rect x="8" y="30" width="28" height="5" rx="2.5" fill="#d9a84e" />
-            <rect x="12" y="21" width="20" height="5" rx="2.5" fill="#d9a84e" opacity=".78" />
-            <rect x="16" y="12" width="12" height="5" rx="2.5" fill="#d9a84e" opacity=".55" />
-            <circle cx="22" cy="7" r="2.6" fill="#ece7df" />
+            <rect x="8" y="30" width="28" height="5" rx="2.5" fill="var(--color-sky-500)" />
+            <rect x="12" y="21" width="20" height="5" rx="2.5" fill="var(--color-sky-500)" opacity=".78" />
+            <rect x="16" y="12" width="12" height="5" rx="2.5" fill="var(--color-sky-500)" opacity=".55" />
+            <circle cx="22" cy="7" r="2.6" fill="var(--color-slate-100)" />
           </svg>
           Lastro
         </h1>
@@ -92,6 +98,28 @@ export default function App() {
             </div>
           ))}
         </nav>
+        <div className="ml-auto flex gap-1 rounded-lg border border-slate-700 bg-slate-950 p-1 text-xs">
+          {(
+            [
+              ['dark', 'Ledger'],
+              ['light', 'Papel'],
+            ] as [Theme, string][]
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTheme(value)}
+              title={value === 'dark' ? 'Tema escuro' : 'Tema claro'}
+              className={`rounded-md px-3 py-1 font-medium ${
+                theme === value
+                  ? 'bg-sky-600 text-inkbrass'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </header>
       {/* Each page mounts fresh on navigation, so the dashboard refetches
           the portfolio after an import without any extra wiring. */}

@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 import { getContributions, type ContributionMonth } from '../api/client'
 import { formatMoney } from '../lib/format'
+import { SkeletonChart } from './Skeleton'
 
 const monthFormatter = new Intl.DateTimeFormat('pt-BR', {
   month: 'short',
@@ -80,24 +81,22 @@ export default function ContributionsChart() {
         {error && (
           <p className="text-sm text-slate-500">Não foi possível carregar os aportes.</p>
         )}
-        {!error && months === null && (
-          <p className="text-sm text-slate-500">Carregando aportes…</p>
-        )}
+        {!error && months === null && <SkeletonChart />}
         {!error && months !== null && (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
-              <CartesianGrid stroke="#322d27" vertical={false} />
+              <CartesianGrid stroke="var(--color-slate-800)" vertical={false} />
               <XAxis
                 dataKey="month"
                 tickFormatter={monthLabel}
-                tick={{ fill: '#6e675c', fontSize: 12 }}
-                axisLine={{ stroke: '#453f36' }}
+                tick={{ fill: 'var(--color-slate-500)', fontSize: 12 }}
+                axisLine={{ stroke: 'var(--color-slate-700)' }}
                 tickLine={false}
                 minTickGap={24}
               />
               <YAxis
                 tickFormatter={(value: number) => compactBRL.format(value)}
-                tick={{ fill: '#6e675c', fontSize: 12 }}
+                tick={{ fill: 'var(--color-slate-500)', fontSize: 12 }}
                 axisLine={false}
                 tickLine={false}
                 width={72}
@@ -105,12 +104,12 @@ export default function ContributionsChart() {
               <Tooltip
                 formatter={(value, name) => [formatMoney(String(value)), String(name)]}
                 labelFormatter={(label) => monthLabel(String(label))}
-                cursor={{ fill: '#322d27', opacity: 0.4 }}
+                cursor={{ fill: 'var(--color-slate-800)', opacity: 0.4 }}
                 contentStyle={{
-                  backgroundColor: '#1b1917',
-                  border: '1px solid #453f36',
+                  backgroundColor: 'var(--color-slate-900)',
+                  border: '1px solid var(--color-slate-700)',
                   borderRadius: '0.5rem',
-                  color: '#ddd7ca',
+                  color: 'var(--color-slate-200)',
                 }}
               />
               <Legend
@@ -141,7 +140,7 @@ export default function ContributionsChart() {
                 dataKey="aportes"
                 name="Aportes"
                 stackId="mes"
-                fill="#a49c8e"
+                fill="var(--color-slate-400)"
                 hide={hidden.aportes}
                 radius={hidden.rendimentos ? [3, 3, 0, 0] : undefined}
               />
@@ -149,7 +148,7 @@ export default function ContributionsChart() {
                 dataKey="rendimentos"
                 name="Rendimentos"
                 stackId="mes"
-                fill="#3aa88d"
+                fill="var(--color-contrib-yield)"
                 hide={hidden.rendimentos}
                 radius={[3, 3, 0, 0]}
               />

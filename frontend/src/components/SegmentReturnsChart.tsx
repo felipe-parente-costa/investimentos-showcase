@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import { getReturns, type ReturnSeries, type ReturnsPeriod } from '../api/client'
+import { SkeletonChart } from './Skeleton'
 
 const PERIODS: ReturnsPeriod[] = ['1M', '3M', '6M', 'YTD', '1A', 'MAX']
 const PERIOD_LABELS: Record<ReturnsPeriod, string> = {
@@ -143,26 +144,24 @@ export default function SegmentReturnsChart({
             Não foi possível carregar a rentabilidade.
           </p>
         )}
-        {!error && series === null && (
-          <p className="text-sm text-slate-500">Carregando rentabilidade…</p>
-        )}
+        {!error && series === null && <SkeletonChart />}
         {!error && series !== null && (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
-              <CartesianGrid stroke="#322d27" vertical={false} />
+              <CartesianGrid stroke="var(--color-slate-800)" vertical={false} />
               <XAxis
                 dataKey="date"
                 tickFormatter={(value: string) =>
                   monthFormatter.format(new Date(`${value}T12:00:00`))
                 }
-                tick={{ fill: '#6e675c', fontSize: 12 }}
-                axisLine={{ stroke: '#453f36' }}
+                tick={{ fill: 'var(--color-slate-500)', fontSize: 12 }}
+                axisLine={{ stroke: 'var(--color-slate-700)' }}
                 tickLine={false}
                 minTickGap={48}
               />
               <YAxis
                 tickFormatter={(value: number) => `${value.toFixed(0)}%`}
-                tick={{ fill: '#6e675c', fontSize: 12 }}
+                tick={{ fill: 'var(--color-slate-500)', fontSize: 12 }}
                 axisLine={false}
                 tickLine={false}
                 width={48}
@@ -176,10 +175,10 @@ export default function SegmentReturnsChart({
                   dayFormatter.format(new Date(`${String(label)}T12:00:00`))
                 }
                 contentStyle={{
-                  backgroundColor: '#1b1917',
-                  border: '1px solid #453f36',
+                  backgroundColor: 'var(--color-slate-900)',
+                  border: '1px solid var(--color-slate-700)',
                   borderRadius: '0.5rem',
-                  color: '#ddd7ca',
+                  color: 'var(--color-slate-200)',
                 }}
               />
               <Legend

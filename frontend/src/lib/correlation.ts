@@ -4,12 +4,15 @@ export interface HoveredCell {
   value: number | null
 }
 
-// -1 → red, 0 → neutral, +1 → green. Alpha scales with magnitude.
-// Pólos alinhados aos tons de ganho/perda do tema Ledger (#3fb968/#e5484d).
+// -1 → red, 0 → neutral, +1 → green. Alpha (via color-mix, não rgba com RGB
+// fixo) escala com a magnitude — assim os pólos seguem as variáveis de
+// ganho/perda do tema atual (--color-green-400/--color-red-400) em vez de um
+// RGB congelado no valor do escuro, e o mesmo código funciona claro/escuro.
 export function cellColor(value: number | null): string {
-  if (value == null) return '#1b1917'
-  if (value >= 0) return `rgba(63, 185, 104, ${Math.min(value, 1)})`
-  return `rgba(229, 72, 77, ${Math.min(-value, 1)})`
+  if (value == null) return 'var(--color-slate-900)'
+  const pct = Math.round(Math.min(Math.abs(value), 1) * 100)
+  const pole = value >= 0 ? 'var(--color-green-400)' : 'var(--color-red-400)'
+  return `color-mix(in srgb, ${pole} ${pct}%, transparent)`
 }
 
 export function formatCoef(value: number | null): string {

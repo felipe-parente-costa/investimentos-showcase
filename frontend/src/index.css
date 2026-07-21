@@ -48,6 +48,98 @@
   --color-emerald-300: #7fd2a0;
   --color-emerald-400: #55c17e;
   --color-emerald-500: #3fb968;
+
+  /* Paleta de dados (lib/colors.ts) como variáveis — não hex direto — para
+     que o mesmo arquivo de constantes reteme sozinho entre claro/escuro sem
+     tocar nenhum componente consumidor (gráficos, donuts, swatches). Valores
+     abaixo = tema escuro (default), validados contra #1b1917 (script
+     validate_palette.js do skill dataviz: banda de luminosidade, croma,
+     ΔE protan/deutan≥8 nos pares adjacentes, contraste≥3:1). */
+  --color-data-blue: #3987e5;
+  --color-data-pink: #d55181;
+  --color-data-gold: #c98500;
+  --color-data-teal: #199e70;
+  --color-data-orange: #d95926;
+  --color-data-violet: #9085e9;
+  --color-data-brass: #d9a84e;
+  --color-data-gray: #6e675c;
+  --color-data-cdi: #5cc39c;
+  --color-data-ibov: #82b4ef;
+  --color-data-sp500: #ec8c5f;
+  --color-data-btc: #e58aab;
+
+  /* Par de contraste local do gráfico de Aportes×Rendimentos (aporte = cinza
+     quente slate-400; rendimento = teal apagado abaixo) — de propósito FORA
+     dos mapas centrais de colors.ts (não é identidade de seção/categoria). */
+  --color-contrib-yield: #3aa88d;
+
+  /* Tinta fixa para texto sobre latão (botões/pills bg-sky-600, chip ativa) —
+     NÃO faz parte da escala neutra porque seu papel (ficar escura sobre um
+     acento sempre médio-claro) não muda entre temas, ao contrário de
+     slate-950 (que É o fundo da página e inverte no claro). Ver
+     `text-inkbrass` nos botões primários. */
+  --color-inkbrass: #1b140a;
+}
+
+/* Modo claro "Papel" (2026-07-21) — mesma família quente, luminosidade
+   invertida. Escolhido como um ponto próprio (não um espelhamento
+   automático do escuro): cada papel de texto/borda revalida seu contraste
+   contra a nova superfície #f1ebdd/#faf7f0 (ver sessão de implementação —
+   contrastes por papel ficaram alinhados aos do tema escuro, ex. tinta
+   secundária ~6,5:1 dark vs ~6,9 mesmo alvo aqui). Paleta de dados
+   revalidada pelo validate_palette.js contra #faf7f0: dourado e violeta
+   escurecidos (ΔE/contraste dos demais já passavam sem ajuste) — mesma
+   ORDEM do DONUT_PALETTE preservada (não reordenar). */
+:root[data-theme='light'] {
+  --color-slate-50: #f7f2e6;
+  --color-slate-100: #231b12; /* tinta primária (mais escura no claro) */
+  --color-slate-200: #3a2f1e;
+  --color-slate-300: #4c3f2a;
+  --color-slate-400: #5f5138; /* tinta secundária */
+  --color-slate-500: #8a7a5c; /* tinta apagada */
+  --color-slate-600: #a89876;
+  --color-slate-700: #c2b393; /* bordas fortes / eixos */
+  --color-slate-800: #ded2b8; /* bordas / pills / grid */
+  --color-slate-900: #faf7f0; /* superfície (cards) */
+  --color-slate-950: #f1ebdd; /* fundo (papel) */
+
+  --color-sky-300: #7a5410;
+  --color-sky-400: #8f6110; /* links */
+  --color-sky-500: #c9973c; /* hover de botão (mais claro que o 600) */
+  --color-sky-600: #a8752a; /* botão primário (com text-inkbrass) */
+  --color-sky-900: #5c4210;
+
+  --color-green-400: #0f7a3d;
+  --color-red-400: #b02128;
+  --color-emerald-300: #166b3f;
+  --color-emerald-400: #0f7a3d;
+  --color-emerald-500: #1f9350;
+
+  --color-data-gold: #a86f00;
+  --color-data-violet: #7a6bd9;
+  --color-data-brass: #a8752a;
+  --color-data-gray: #5f5138;
+  --color-data-cdi: #7fae9a;
+  --color-data-ibov: #8fa8c9;
+  --color-data-sp500: #c99a7f;
+  --color-data-btc: #c98fa0;
+
+  --color-contrib-yield: #177a63;
+
+  /* Âmbar de aviso: no escuro fica no DEFAULT do Tailwind (nunca precisou de
+     ajuste — o âmbar quase-preto de fundo e o âmbar claro de texto já
+     funcionam contra a página quase-preta). No claro a mesma polaridade
+     quebra (fundo quase-preto vira mancha suja sobre papel; texto claro
+     desaparece) — redefinida aqui com a MESMA lógica de inversão do slate:
+     900/950 (papel dos fundos em baixa opacidade) ficam claros, 200-500
+     (papel do texto) ficam escuros. */
+  --color-amber-200: #5f3d03;
+  --color-amber-300: #744c05;
+  --color-amber-400: #855807;
+  --color-amber-500: #96650a;
+  --color-amber-700: #b8842c;
+  --color-amber-900: #f2ddb0;
+  --color-amber-950: #f7ecd6;
 }
 
 /* Typography scale (Fase 1 do redesign): 4 níveis reutilizáveis de tipografia,

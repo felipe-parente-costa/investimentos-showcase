@@ -9,6 +9,7 @@ import {
   YAxis,
 } from 'recharts'
 import { getPortfolioHistory, type HistoryPoint } from '../api/client'
+import { SkeletonChart } from './Skeleton'
 import { formatMoney } from '../lib/format'
 import { SECTION_COLORS } from '../lib/colors'
 import {
@@ -99,9 +100,7 @@ export default function PatrimonyChart() {
             Não foi possível carregar o histórico.
           </p>
         )}
-        {!error && points === null && (
-          <p className="text-sm text-slate-500">Carregando histórico…</p>
-        )}
+        {!error && points === null && <SkeletonChart />}
         {!error && points !== null && (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
@@ -119,18 +118,18 @@ export default function PatrimonyChart() {
                   />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#322d27" vertical={false} />
+              <CartesianGrid stroke="var(--color-slate-800)" vertical={false} />
               <XAxis
                 dataKey="date"
                 tickFormatter={axisDate}
-                tick={{ fill: '#6e675c', fontSize: 12 }}
-                axisLine={{ stroke: '#453f36' }}
+                tick={{ fill: 'var(--color-slate-500)', fontSize: 12 }}
+                axisLine={{ stroke: 'var(--color-slate-700)' }}
                 tickLine={false}
                 minTickGap={48}
               />
               <YAxis
                 tickFormatter={(value: number) => compactBRL.format(value)}
-                tick={{ fill: '#6e675c', fontSize: 12 }}
+                tick={{ fill: 'var(--color-slate-500)', fontSize: 12 }}
                 axisLine={false}
                 tickLine={false}
                 width={72}
@@ -139,10 +138,10 @@ export default function PatrimonyChart() {
                 formatter={(value) => [formatMoney(String(value)), 'Patrimônio']}
                 labelFormatter={(label) => tooltipDate(String(label))}
                 contentStyle={{
-                  backgroundColor: '#1b1917',
-                  border: '1px solid #453f36',
+                  backgroundColor: 'var(--color-slate-900)',
+                  border: '1px solid var(--color-slate-700)',
                   borderRadius: '0.5rem',
-                  color: '#ddd7ca',
+                  color: 'var(--color-slate-200)',
                 }}
               />
               <Area
