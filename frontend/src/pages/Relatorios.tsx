@@ -70,6 +70,30 @@ function niceScale(values: number[]): { domain: [number, number]; ticks: number[
   return { domain: [lo(), hi()], ticks }
 }
 
+// One-sentence recap of the month, derived entirely from data already on
+// screen (the evolution series + the selected snapshot's own fields) — no
+// new fetch, no new number that isn't independently displayed elsewhere.
+function narrative(detail: SnapshotDetail, items: SnapshotSummary[]): string {
+  const label = monthLabel(detail.year_month)
+  const capitalized = label.charAt(0).toUpperCase() + label.slice(1)
+  const idx = items.findIndex((i) => i.year_month === detail.year_month)
+  const previous = idx > 0 ? items[idx - 1] : null
+
+  if (!previous) {
+    return `${capitalized}: primeiro relatório registrado — patrimônio de ${formatMoney(detail.total_brl)}.`
+  }
+
+  const deltaBrl = Number(detail.total_brl) - Number(previous.total_brl)
+  const direction = deltaBrl > 0 ? 'subiu' : deltaBrl < 0 ? 'caiu' : 'ficou estável'
+  const deltaText =
+    deltaBrl === 0 ? '' : ` ${formatMoney(String(Math.abs(deltaBrl)))} (${pct(detail.month_return_pct)})`
+  const income = Number(detail.income_month_brl)
+  const incomeClause =
+    income > 0 ? `, incluindo ${formatMoney(detail.income_month_brl)} em dividendos` : ''
+
+  return `${capitalized}: patrimônio ${direction}${deltaText} em relação a ${monthLabel(previous.year_month)}${incomeClause}.`
+}
+
 function dictToSlices(
   dict: Record<string, string>,
   label: (key: string) => string,
@@ -148,7 +172,7 @@ export default function Relatorios() {
           type="button"
           onClick={generate}
           disabled={generating}
-          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-500 disabled:opacity-50"
+          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-inkbrass hover:bg-sky-500 disabled:opacity-50"
         >
           {generating ? 'Gerando…' : 'Gerar relatório do mês atual'}
         </button>
@@ -173,19 +197,19 @@ export default function Relatorios() {
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={evolution} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
-                  <CartesianGrid stroke="#322d27" vertical={false} />
+                  <CartesianGrid stroke="var(--color-slate-800)" vertical={false} />
                   <XAxis
                     dataKey="month"
                     tickFormatter={monthLabel}
-                    tick={{ fill: '#6e675c', fontSize: 12 }}
-                    axisLine={{ stroke: '#453f36' }}
+                    tick={{ fill: 'var(--color-slate-500)', fontSize: 12 }}
+                    axisLine={{ stroke: 'var(--color-slate-700)' }}
                     tickLine={false}
                   />
                   <YAxis
                     domain={evolutionScale.domain}
                     ticks={evolutionScale.ticks}
                     tickFormatter={(v: number) => compactBRL.format(v)}
-                    tick={{ fill: '#6e675c', fontSize: 12 }}
+                    tick={{ fill: 'var(--color-slate-500)', fontSize: 12 }}
                     axisLine={false}
                     tickLine={false}
                     width={72}
@@ -193,12 +217,12 @@ export default function Relatorios() {
                   <Tooltip
                     formatter={(v) => [formatMoney(String(v)), 'Patrimônio']}
                     labelFormatter={(l) => monthLabel(String(l))}
-                    cursor={{ stroke: '#453f36' }}
+                    cursor={{ stroke: 'var(--color-slate-700)' }}
                     contentStyle={{
-                      backgroundColor: '#1b1917',
-                      border: '1px solid #453f36',
+                      backgroundColor: 'var(--color-slate-900)',
+                      border: '1px solid var(--color-slate-700)',
                       borderRadius: '0.5rem',
-                      color: '#ddd7ca',
+                      color: 'var(--color-slate-200)',
                     }}
                   />
                   <Line
@@ -214,13 +238,13 @@ export default function Relatorios() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {items.map((s) => (
               <button
                 key={s.year_month}
                 type="button"
                 onClick={() => setSelected(s.year_month)}
-                className={`rounded-lg border px-3 py-1.5 text-sm ${
+                className={`shrink-0 rounded-lg border px-3 py-1.5 text-sm ${
                   selected === s.year_month
                     ? 'border-sky-500 bg-sky-500/10 text-slate-100'
                     : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-600'
@@ -235,6 +259,8 @@ export default function Relatorios() {
 
       {detail && (
         <div className="space-y-6">
+          <p className="text-sm text-slate-300">{narrative(detail, items)}</p>
+
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <SummaryStat label="Patrimônio (fim do mês)" value={formatMoney(detail.total_brl)} />
             <SummaryStat
@@ -309,7 +335,7 @@ export default function Relatorios() {
                   const pnl = p.unrealized_pnl_brl != null ? Number(p.unrealized_pnl_brl) : null
                   return (
                     <tr
-                      key={p.ticker}
+                      key={`${p.ticker}-${p.custody ?? ''}`}
                       className="border-b border-slate-800/60 last:border-b-0"
                     >
                       <td className="px-4 py-2 font-medium">{p.ticker}</td>
