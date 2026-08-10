@@ -9,7 +9,8 @@ Aplicação web **pessoal, single-user** que consolida investimentos de três fo
 B3 (extrato de Movimentação), Avenue (extrato CSV) e Binance (exports de trade/order
 history) — em um dashboard único: patrimônio consolidado em BRL, seções EUA e cripto
 em USD nativo, renda (dividendos/JCP/rendimentos), dividend yield 12m por posição e
-da carteira, TWR contra benchmarks (CDI, IBOV, S&P 500, BTC), correlação, CAPM e
+da carteira, TWR contra benchmarks (CDI, IBOV, S&P 500, BTC), uma seção de risco
+completa (volatilidade, VaR/CVaR, drawdown, betas, concentração e correlação), CAPM e
 relatório mensal.
 
 A ideia central é **automatizar a vida do investidor**: você arrasta o extrato
@@ -42,9 +43,15 @@ ajustes e correções auditáveis.
 |---|---|
 | ![Renda Fixa](docs/screenshots/renda-fixa.png) | ![Lançamentos](docs/screenshots/lancamentos.png) |
 
-| Mercado (indicadores externos) | Correlação (matriz de Pearson) |
-|---|---|
-| ![Mercado](docs/screenshots/mercado.png) | ![Correlação](docs/screenshots/correlacao.png) |
+**Risco — terminal de risco da carteira consolidada:** volatilidade, Sharpe/Sortino,
+drawdown (magnitude e duração), VaR/CVaR, betas, concentração, contribuição de risco por
+setor e cenários de estresse.
+
+![Risco](docs/screenshots/risco.png)
+
+**Mercado — indicadores externos como contexto**, nunca como gatilho de compra/venda.
+
+![Mercado](docs/screenshots/mercado.png)
 
 **Importar — o coração da automação:** arraste o arquivo exportado da fonte e pronto.
 
@@ -136,11 +143,36 @@ para o subconjunto de campos comum a ambos os formatos, sem duplicar lógica). A
 de ticker coloridos pela classe do ativo, cabeçalho fixo na lista plana e relatório
 mensal com uma frase-resumo gerada dos dados já exibidos completam o conjunto.
 
-**Correlação e CAPM sobre as cotações em cache.** Matriz de Pearson dos retornos
-diários da carteira (com seleção de ativos e um recorte automático das 10 maiores
-posições) e, por segmento, beta, alfa de Jensen e correlação contra o benchmark —
-tudo computado localmente a partir das séries já cacheadas, sem chamadas externas
-no request path.
+**Seção de risco construída sobre séries já existentes.** O motor
+(`app/services/risk.py`) não recalcula nada do zero: consome o índice de TWR diário da
+carteira e as cotações históricas já cacheadas. Entrega volatilidade anualizada,
+Sharpe/Sortino contra o CDI, curva de drawdown com **magnitude e duração** (pico-ao-fundo
+do pior episódio e dias em queda desde o último pico — rastreados separadamente, porque
+o drawdown atual nem sempre é o pior), VaR histórico 95/99, VaR paramétrico e CVaR,
+assimetria/curtose, betas contra IBOV e S&P 500, tracking error, HHI por posição/
+instituição/segmento e **índice de diversificação** (volatilidade média ponderada dos
+grupos ÷ volatilidade real da carteira — revela a concentração por correlação que um
+HHI por peso não enxerga).
+
+Por setor e sub-setor, a **contribuição de risco vem de uma decomposição de Euler da
+variância** (soma exata de 100% entre os grupos), ao lado da volatilidade da cesta
+ponderada e da correlação média intragrupo. Cenários de estresse (IBOV/S&P 500 −20%,
+BTC −30%, dólar ±15%) aplicam o choque à exposição real de cada segmento usando o beta
+do CAPM quando existe — e dizem explicitamente quando não existe, ou quando a janela de
+beta disponível é mais longa que a janela de risco selecionada. Nenhum número aparece
+sem as premissas ao lado.
+
+**Renda fixa entra pela lente certa.** Vale a distinção que a classe do ativo sozinha não
+faz: Tesouro Direto é marcado a mercado e participa normalmente de volatilidade,
+correlação e contribuição de risco; renda fixa privada fica a custo e **é excluída de todo
+cálculo baseado em preço** — volatilidade ou VaR sobre um papel que não é remarcado seria
+risco fabricado. Ela ganha uma lente própria: concentração por indexador e por emissor.
+
+**Correlação em três recortes.** Matriz de Pearson dos retornos diários entre ativos
+(com filtro manual), entre setores/sub-setores (cestas ponderadas por valor) e um
+recorte automático das 10 maiores posições — mais beta, alfa de Jensen e correlação por
+segmento (CAPM). Tudo computado localmente a partir das séries em cache, sem chamada
+externa no request path.
 
 ## Rodando a demo
 

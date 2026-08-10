@@ -63,6 +63,9 @@ COUNTRY_PT = {
 class AssetMetaResult:
     sector: str | None
     country: str | None
+    # Sub-setor; só populado para stock/etf (a seção Risco usa isso pra
+    # agrupar sub-setor — fii/renda fixa/cripto não têm indústria na fonte).
+    industry: str | None = None
 
 
 _fetch_attempts: dict[str, datetime] = {}
@@ -84,7 +87,9 @@ def get_asset_meta(
 
     cached = db.get(AssetMeta, ticker)
     if cached is not None:
-        return AssetMetaResult(sector=cached.sector, country=cached.country)
+        return AssetMetaResult(
+            sector=cached.sector, country=cached.country, industry=cached.industry
+        )
 
     fetcher = META_FETCHERS.get(market)
     if fetcher is None:
@@ -97,12 +102,13 @@ def get_asset_meta(
     _fetch_attempts[ticker] = now
 
     try:
-        sector, country, source = fetcher(ticker)
+        sector, country, industry, source = fetcher(ticker)
     except QuoteFetchError:
         return AssetMetaResult(sector=None, country=None)
 
     sector = _normalize(sector, SECTOR_PT)
     country = _normalize(country, COUNTRY_PT)
+    industry = industry.strip() if industry else None
     if country is None:
         # Listed-without-profile (typically ETFs, which the profile APIs
         # don't classify): default to the listing market's country. Stocks
@@ -113,14 +119,19 @@ def get_asset_meta(
             country = "Estados Unidos"
     db.add(
         AssetMeta(
-            ticker=ticker, sector=sector, country=country, source=source, fetched_at=now
+            ticker=ticker,
+            sector=sector,
+            country=country,
+            industry=industry,
+            source=source,
+            fetched_at=now,
         )
     )
     db.commit()
-    return AssetMetaResult(sector=sector, country=country)
+    return AssetMetaResult(sector=sector, country=country, industry=industry)
 
 
-def fetch_b3_profile(ticker: str) -> tuple[str | None, str | None, str]:
+def fetch_b3_profile(ticker: str) -> tuple[str | None, str | None, str | None, str]:
     try:
         params = {"modules": "summaryProfile"}
         if settings.brapi_token:
@@ -129,14 +140,21 @@ def fetch_b3_profile(ticker: str) -> tuple[str | None, str | None, str]:
         results = data.get("results") or []
         profile = results[0].get("summaryProfile") if results else None
         if profile and (profile.get("sector") or profile.get("country")):
-            return profile.get("sector"), profile.get("country"), "brapi"
+            return (
+                profile.get("sector"),
+                profile.get("country"),
+                profile.get("industry"),
+                "brapi",
+            )
     except QuoteFetchError:
         pass
-    sector, country, _ = fetch_yfinance_profile(f"{ticker}.SA")
-    return sector, country, "yfinance"
+    sector, country, industry, _ = fetch_yfinance_profile(f"{ticker}.SA")
+    return sector, country, industry, "yfinance"
 
 
-def fetch_yfinance_profile(ticker: str) -> tuple[str | None, str | None, str]:
+def fetch_yfinance_profile(
+    ticker: str,
+) -> tuple[str | None, str | None, str | None, str]:
     try:
         import yfinance
 
@@ -149,10 +167,12 @@ def fetch_yfinance_profile(ticker: str) -> tuple[str | None, str | None, str]:
     # itself failed and should be retried.
     if not info.get("symbol") and not info.get("quoteType"):
         raise QuoteFetchError(f"no profile data for {ticker}")
-    return info.get("sector"), info.get("country"), "yfinance"
+    return info.get("sector"), info.get("country"), info.get("industry"), "yfinance"
 
 
-META_FETCHERS: dict[Market, Callable[[str], tuple[str | None, str | None, str]]] = {
+META_FETCHERS: dict[
+    Market, Callable[[str], tuple[str | None, str | None, str | None, str]]
+] = {
     Market.br: fetch_b3_profile,
     Market.us: fetch_yfinance_profile,
 }

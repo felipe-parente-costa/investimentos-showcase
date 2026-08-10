@@ -66,13 +66,19 @@ export default function AllocationDonut({
   const renderDirectLabel = (props: {
     cx: number
     cy: number
-    midAngle: number
+    // Optional in recharts' own PieSectorData type (only populated once the
+    // sector geometry is computed) — Pie always provides it by the time our
+    // label renderer runs, so 0 here is dead code, not a real fallback.
+    midAngle?: number
     outerRadius: number
     index: number
-    payload: DonutSlice
+    // Also optional in recharts' type (it's `any` there, spread from
+    // whatever data was fed in) — same "always present in practice, guard
+    // anyway" situation as midAngle above.
+    payload?: DonutSlice
   }) => {
-    const { cx, cy, midAngle, outerRadius, index, payload } = props
-    if (index > 1) return null
+    const { cx, cy, midAngle = 0, outerRadius, index, payload } = props
+    if (index > 1 || !payload) return null
     const radius = outerRadius + 12
     const x = cx + radius * Math.cos(-midAngle * RADIAN)
     const y = cy + radius * Math.sin(-midAngle * RADIAN)

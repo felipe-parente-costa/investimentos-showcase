@@ -16,7 +16,11 @@ from app.schemas.portfolio import (
     ContributionMonthOut,
     ContributionsOut,
     CorrelationOut,
+    FixedIncomeRiskOut,
+    GroupCorrelationOut,
     HistoryPointOut,
+    IndexerSliceOut,
+    InstitutionSliceOut,
     PerformanceOut,
     PerformancePointOut,
     PortfolioHistoryOut,
@@ -25,8 +29,13 @@ from app.schemas.portfolio import (
     ReturnPointOut,
     ReturnSeriesOut,
     ReturnsOut,
+    RiskGroupOut,
+    RiskOut,
+    RiskOverallOut,
+    RiskPointOut,
     SegmentOut,
     SegmentSummaryOut,
+    StressScenarioOut,
     UsdBrlMarketOut,
 )
 from app.services.assets import get_asset_meta
@@ -45,6 +54,7 @@ from app.services.quotes import (
 from app.services.usd import FxUnavailable, to_usd_transactions
 from app.services.indexer import resolve_indexer
 from app.services.returns import build_returns
+from app.services.risk import build_risk
 from app.services.segments import SegmentRow, aggregate_segments, segment_of
 from app.services.tesouro import parse_bond_ticker
 
@@ -277,6 +287,54 @@ def get_portfolio_capm(
             )
             for m in result.segments
         ],
+        warnings=result.warnings,
+    )
+
+
+@router.get("/risk", response_model=RiskOut)
+def get_portfolio_risk(
+    period: str = "1A",
+    group_by: str = "sector",
+    db: Session = Depends(get_db),
+) -> RiskOut:
+    """Consolidated risk terminal: volatility/Sharpe/Sortino/drawdown/VaR/
+    CVaR/beta/concentration for the whole portfolio, plus a sector or
+    sub-setor breakdown (`group_by=sector|subsector`) with basket
+    volatility and risk contribution, stress scenarios and a fixed-income-
+    specific concentration lens. Renda fixa privada is excluded from every
+    price-based figure (marked at cost, not mark-to-market)."""
+    result = build_risk(db, period, group_by)
+    return RiskOut(
+        period=result.period,
+        period_label=result.period_label,
+        group_by=result.group_by,
+        overall=RiskOverallOut(**vars(result.overall)),
+        drawdown_series=[RiskPointOut(date=p.date, value=p.value) for p in result.drawdown_series],
+        rolling_volatility_21d=[
+            RiskPointOut(date=p.date, value=p.value) for p in result.rolling_volatility_21d
+        ],
+        rolling_volatility_63d=[
+            RiskPointOut(date=p.date, value=p.value) for p in result.rolling_volatility_63d
+        ],
+        daily_returns=[RiskPointOut(date=p.date, value=p.value) for p in result.daily_returns],
+        groups=[RiskGroupOut(**vars(g)) for g in result.groups],
+        group_correlation=GroupCorrelationOut(
+            labels=result.group_correlation.labels, matrix=result.group_correlation.matrix
+        ),
+        risk_universe_coverage_pct=result.risk_universe_coverage_pct,
+        stress_scenarios=[StressScenarioOut(**vars(s)) for s in result.stress_scenarios],
+        fixed_income=(
+            FixedIncomeRiskOut(
+                total_brl=result.fixed_income.total_brl,
+                by_indexer=[IndexerSliceOut(**vars(s)) for s in result.fixed_income.by_indexer],
+                by_institution=[
+                    InstitutionSliceOut(**vars(s)) for s in result.fixed_income.by_institution
+                ],
+                hhi_institution=result.fixed_income.hhi_institution,
+            )
+            if result.fixed_income is not None
+            else None
+        ),
         warnings=result.warnings,
     )
 

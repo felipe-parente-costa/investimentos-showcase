@@ -144,6 +144,108 @@ class SegmentOut(BaseModel):
     position_count: int
 
 
+class RiskOverallOut(BaseModel):
+    volatility_annual_pct: float | None = None
+    sharpe: float | None = None
+    sortino: float | None = None
+    max_drawdown_pct: float | None = None
+    max_drawdown_date: date | None = None
+    max_drawdown_duration_days: int | None = None
+    current_drawdown_pct: float | None = None
+    current_drawdown_days: int | None = None
+    var_hist_95_pct: float | None = None
+    var_hist_95_brl: Decimal | None = None
+    var_hist_99_pct: float | None = None
+    var_hist_99_brl: Decimal | None = None
+    var_parametric_95_pct: float | None = None
+    cvar_hist_95_pct: float | None = None
+    cvar_hist_95_brl: Decimal | None = None
+    skewness: float | None = None
+    kurtosis_excess: float | None = None
+    beta_ibov: float | None = None
+    beta_sp500: float | None = None
+    tracking_error_cdi_pct: float | None = None
+    observations: int
+    hhi_position: float | None = None
+    effective_positions: float | None = None
+    top5_concentration_pct: float | None = None
+    hhi_institution: float | None = None
+    hhi_segment: float | None = None
+    diversification_ratio: float | None = None
+    usd_direct_exposure_pct: float | None = None
+    total_value_brl: Decimal | None = None
+
+
+class RiskPointOut(BaseModel):
+    date: date
+    value: float
+
+
+class RiskGroupOut(BaseModel):
+    key: str
+    label: str
+    weight_pct: float
+    market_value_brl: Decimal
+    position_count: int
+    priced_position_count: int
+    volatility_annual_pct: float | None = None
+    risk_contribution_pct: float | None = None
+    avg_intra_correlation: float | None = None
+
+
+class GroupCorrelationOut(BaseModel):
+    labels: list[str]
+    matrix: list[list[float | None]]
+
+
+class StressScenarioOut(BaseModel):
+    key: str
+    label: str
+    shock_pct: float
+    exposure_brl: Decimal
+    beta: float
+    beta_note: str | None = None
+    impact_brl: Decimal | None = None
+    impact_pct: float | None = None
+
+
+class IndexerSliceOut(BaseModel):
+    key: str
+    label: str
+    value_brl: Decimal
+    weight_pct: float
+
+
+class InstitutionSliceOut(BaseModel):
+    label: str
+    value_brl: Decimal
+    weight_pct: float
+
+
+class FixedIncomeRiskOut(BaseModel):
+    total_brl: Decimal
+    by_indexer: list[IndexerSliceOut]
+    by_institution: list[InstitutionSliceOut]
+    hhi_institution: float | None = None
+
+
+class RiskOut(BaseModel):
+    period: str
+    period_label: str
+    group_by: str
+    overall: RiskOverallOut
+    drawdown_series: list[RiskPointOut]
+    rolling_volatility_21d: list[RiskPointOut]
+    rolling_volatility_63d: list[RiskPointOut]
+    daily_returns: list[RiskPointOut]
+    groups: list[RiskGroupOut]
+    group_correlation: GroupCorrelationOut
+    risk_universe_coverage_pct: float | None = None
+    stress_scenarios: list[StressScenarioOut]
+    fixed_income: FixedIncomeRiskOut | None = None
+    warnings: list[str]
+
+
 class SegmentSummaryOut(BaseModel):
     key: str
     label: str

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import Correlacao from './pages/Correlacao'
 import Dashboard from './pages/Dashboard'
 import Import from './pages/Import'
 import Lancamentos from './pages/Lancamentos'
 import Mercado from './pages/Mercado'
 import Relatorios from './pages/Relatorios'
+import Risco from './pages/Risco'
 import Segmento, { type SegmentKey } from './pages/Segmento'
 import { applyTheme, getStoredTheme, type Theme } from './lib/theme'
 
@@ -15,7 +15,7 @@ type Page =
   | 'crypto'
   | 'rf'
   | 'lancamentos'
-  | 'correlacao'
+  | 'risco'
   | 'relatorios'
   | 'mercado'
   | 'import'
@@ -35,7 +35,7 @@ const NAV_GROUPS: { value: Page; label: string }[][] = [
   ],
   [
     { value: 'mercado', label: 'Mercado' },
-    { value: 'correlacao', label: 'Correlação' },
+    { value: 'risco', label: 'Risco' },
     { value: 'relatorios', label: 'Relatórios' },
   ],
   [
@@ -128,7 +128,7 @@ export default function App() {
         <Segmento key={page} segment={page as SegmentKey} />
       )}
       {page === 'lancamentos' && <Lancamentos />}
-      {page === 'correlacao' && <Correlacao />}
+      {page === 'risco' && <Risco />}
       {page === 'relatorios' && <Relatorios />}
       {page === 'mercado' && <Mercado />}
       {page === 'import' && <Import onGoToDashboard={() => setPage('dashboard')} />}

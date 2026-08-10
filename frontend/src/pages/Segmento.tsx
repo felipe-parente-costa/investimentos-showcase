@@ -9,6 +9,7 @@ import UsdBrlMarketCard from '../components/UsdBrlMarketCard'
 import { SkeletonCard, SkeletonChart, SkeletonRows } from '../components/Skeleton'
 import {
   type GroupDef,
+  type Groupable,
   brasilGroup,
   BRASIL_GROUPS,
   euaGroup,
@@ -76,7 +77,7 @@ const CONFIGS: Record<SegmentKey, SegmentConfig> = {
 // Per-page grouping (Cripto is handled separately, ungrouped).
 const GROUPING: Record<
   'br' | 'us' | 'rf',
-  { groupOf: (p: Position) => string; groupMeta: Record<string, GroupDef> }
+  { groupOf: (p: Groupable) => string; groupMeta: Record<string, GroupDef> }
 > = {
   br: { groupOf: brasilGroup, groupMeta: BRASIL_GROUPS },
   us: { groupOf: euaGroup, groupMeta: EUA_GROUPS },
@@ -130,12 +131,10 @@ export default function Segmento({ segment }: Props) {
   const config = CONFIGS[segment]
   const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // App.tsx mounts this component with `key={page}` (page === segment), so a
+  // segment change always remounts fresh — this state already starts at
+  // 'all' on every section, no reset-on-prop-change effect needed.
   const [assetClassFilter, setAssetClassFilter] = useState<AssetClassFilter>('all')
-
-  // Reset do filtro de classe ao trocar de seção (o chip volta para "Tudo").
-  useEffect(() => {
-    setAssetClassFilter('all')
-  }, [segment])
 
   useEffect(() => {
     let cancelled = false

@@ -535,6 +535,119 @@ export function getCapm(period: CapmPeriod = '1A'): Promise<CapmResponse> {
   return request<CapmResponse>(`/portfolio/capm?period=${period}`)
 }
 
+export type RiskPeriod = '3M' | '6M' | '1A' | '2A' | 'MAX'
+export type RiskGroupBy = 'sector' | 'subsector'
+
+export interface RiskOverall {
+  volatility_annual_pct: number | null
+  sharpe: number | null
+  sortino: number | null
+  max_drawdown_pct: number | null
+  max_drawdown_date: string | null
+  max_drawdown_duration_days: number | null
+  current_drawdown_pct: number | null
+  current_drawdown_days: number | null
+  var_hist_95_pct: number | null
+  var_hist_95_brl: string | null
+  var_hist_99_pct: number | null
+  var_hist_99_brl: string | null
+  var_parametric_95_pct: number | null
+  cvar_hist_95_pct: number | null
+  cvar_hist_95_brl: string | null
+  skewness: number | null
+  kurtosis_excess: number | null
+  beta_ibov: number | null
+  beta_sp500: number | null
+  tracking_error_cdi_pct: number | null
+  observations: number
+  hhi_position: number | null
+  effective_positions: number | null
+  top5_concentration_pct: number | null
+  hhi_institution: number | null
+  hhi_segment: number | null
+  diversification_ratio: number | null
+  usd_direct_exposure_pct: number | null
+  total_value_brl: string | null
+}
+
+export interface RiskPoint {
+  date: string
+  value: number
+}
+
+export interface RiskGroup {
+  key: string
+  label: string
+  weight_pct: number
+  market_value_brl: string
+  position_count: number
+  priced_position_count: number
+  volatility_annual_pct: number | null
+  risk_contribution_pct: number | null
+  avg_intra_correlation: number | null
+}
+
+export interface GroupCorrelation {
+  labels: string[]
+  matrix: (number | null)[][]
+}
+
+export interface StressScenario {
+  key: string
+  label: string
+  shock_pct: number
+  exposure_brl: string
+  beta: number
+  beta_note: string | null
+  impact_brl: string | null
+  impact_pct: number | null
+}
+
+export interface IndexerSlice {
+  key: string
+  label: string
+  value_brl: string
+  weight_pct: number
+}
+
+export interface InstitutionSlice {
+  label: string
+  value_brl: string
+  weight_pct: number
+}
+
+export interface FixedIncomeRisk {
+  total_brl: string
+  by_indexer: IndexerSlice[]
+  by_institution: InstitutionSlice[]
+  hhi_institution: number | null
+}
+
+export interface RiskResponse {
+  period: string
+  period_label: string
+  group_by: string
+  overall: RiskOverall
+  drawdown_series: RiskPoint[]
+  rolling_volatility_21d: RiskPoint[]
+  rolling_volatility_63d: RiskPoint[]
+  daily_returns: RiskPoint[]
+  groups: RiskGroup[]
+  group_correlation: GroupCorrelation
+  risk_universe_coverage_pct: number | null
+  stress_scenarios: StressScenario[]
+  fixed_income: FixedIncomeRisk | null
+  warnings: string[]
+}
+
+export function getRisk(params: {
+  period: RiskPeriod
+  groupBy: RiskGroupBy
+}): Promise<RiskResponse> {
+  const search = new URLSearchParams({ period: params.period, group_by: params.groupBy })
+  return request<RiskResponse>(`/portfolio/risk?${search}`)
+}
+
 export interface SnapshotSummary {
   year_month: string
   as_of_date: string
