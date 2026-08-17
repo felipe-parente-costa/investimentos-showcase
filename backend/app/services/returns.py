@@ -4,8 +4,8 @@ Reuses the patrimony-history TWR engine: each segment is the same chained
 daily return computed over a filtered subset of transactions (total /
 Brasil / EUA / Cripto / Renda Fixa), sharing one closes/FX load so the
 series stay aligned. Every series is rebased to 0% at the start of the
-requested period so segments and benchmarks (CDI, IBOV, S&P500, BTC) can
-be overlaid on one axis.
+requested period so segments and benchmarks (CDI, IBOV, S&P500, BTC,
+IPCA+6, Dólar+5) can be overlaid on one axis.
 
 Renda fixa is valued at cost (no mark-to-market, per project scope), so
 its return reflects only realized cash events; a warning is emitted.
@@ -61,7 +61,14 @@ SEGMENTS: dict[str, SegmentDef] = {
     ),
 }
 
-BENCHMARK_LABELS = {"cdi": "CDI", "ibov": "IBOV", "sp500": "S&P 500", "btc": "BTC"}
+BENCHMARK_LABELS = {
+    "cdi": "CDI",
+    "ibov": "IBOV",
+    "sp500": "S&P 500",
+    "btc": "BTC",
+    "ipca6": "IPCA+6",
+    "dolar5": "Dólar+5",
+}
 
 PERIOD_GRANULARITY: dict[str, Granularity] = {
     "1M": "daily",

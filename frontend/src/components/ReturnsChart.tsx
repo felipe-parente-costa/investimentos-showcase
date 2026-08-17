@@ -47,6 +47,8 @@ const BENCHMARKS: LineDef[] = [
   { key: 'ibov', label: 'IBOV', color: BENCHMARK_COLORS.ibov, kind: 'benchmark' },
   { key: 'sp500', label: 'S&P 500', color: BENCHMARK_COLORS.sp500, kind: 'benchmark' },
   { key: 'btc', label: 'BTC', color: BENCHMARK_COLORS.btc, kind: 'benchmark' },
+  { key: 'ipca6', label: 'IPCA+6', color: BENCHMARK_COLORS.ipca6, kind: 'benchmark' },
+  { key: 'dolar5', label: 'Dólar+5', color: BENCHMARK_COLORS.dolar5, kind: 'benchmark' },
 ]
 
 const ALL_LINES = [...SEGMENTS, ...BENCHMARKS]
@@ -86,9 +88,6 @@ export default function ReturnsChart() {
   const [period, setPeriod] = useState<ReturnsPeriod>('1A')
   const [selected, setSelected] = useState<Record<string, boolean>>({
     total: true,
-    br: true,
-    us: true,
-    crypto: true,
   })
   const [series, setSeries] = useState<ReturnSeries[] | null>(null)
   const [error, setError] = useState(false)

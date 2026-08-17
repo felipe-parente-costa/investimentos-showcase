@@ -82,12 +82,18 @@ export const CURRENCY_COLORS: Record<string, string> = {
 // "pertence" visualmente ao segmento e se distingue por luminosidade + traço no
 // escuro; no claro (onde "mais claro" desapareceria contra a página) a mesma
 // variável passa a ser uma versão dessaturada/acinzentada do matiz — o traço
-// tracejado vira o principal diferenciador de linha ali.
+// tracejado vira o principal diferenciador de linha ali. IPCA+6 e Dólar+5 não
+// têm seção-par (são referências macro, não segmentos da carteira); usam os
+// dois matizes restantes da paleta de 6 (dourado, violeta) — validados junto
+// dos 4 existentes via validate_palette.js (mesmo pior par ΔE do conjunto já
+// aprovado, sem degradação: dark 10.2 e58aab↔ec8c5f, light 6.3 c98fa0↔c99a7f).
 export const BENCHMARK_COLORS: Record<string, string> = {
   cdi: 'var(--color-data-cdi)', // par da RF
   ibov: 'var(--color-data-ibov)', // par do Brasil
   sp500: 'var(--color-data-sp500)', // par dos EUA
   btc: 'var(--color-data-btc)', // par da Cripto
+  ipca6: 'var(--color-data-ipca6)', // dourado — sem seção-par
+  dolar5: 'var(--color-data-dolar5)', // violeta — sem seção-par
 }
 
 // Cor fixa de uma classe de ativo. Ações dividem por região (`market`):

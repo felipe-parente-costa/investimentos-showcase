@@ -6,11 +6,19 @@
   so the comparison with the BRL portfolio is currency-consistent.
 - BTC: BTCBRL daily klines from Binance (shared cache with the BTC
   position history).
+- IPCA+6: monthly IPCA (SGS series 433) spread evenly across the calendar
+  days of its reference month, compounded with a fixed +6% a.a. add-on
+  (252 business-day convention, same base as CDI). Frozen (no IPCA accrual,
+  add-on keeps accruing) during the current month until BCB publishes it.
+- Dólar+5: day-over-day USD/BRL PTAX variation compounded with a fixed
+  +5% a.a. add-on (same 252 business-day convention). The add-on only
+  accrues on business days; weekends carry the index flat.
 
 Series are cached in the quotes table under their own tickers and carried
 forward over non-trading days, like position closes.
 """
 
+import calendar
 import json
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -33,9 +41,11 @@ from app.services.quotes import QuoteFetchError
 
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
+BUSINESS_DAYS_PER_YEAR = 252
 SGS_CDI_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados"
+SGS_IPCA_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados"
 
-BenchmarkName = Literal["cdi", "ibov", "ifix", "sp500", "btc"]
+BenchmarkName = Literal["cdi", "ibov", "ifix", "sp500", "btc", "ipca6", "dolar5"]
 
 
 @dataclass
@@ -51,18 +61,18 @@ class PerformanceResult:
     warnings: list[str] = field(default_factory=list)
 
 
-def fetch_cdi_rates(ticker: str, start: date, end: date) -> dict[date, Decimal]:
+def _fetch_sgs_series(url: str, label: str, start: date, end: date) -> dict[date, Decimal]:
     params = {
         "formato": "json",
         "dataInicial": start.strftime("%d/%m/%Y"),
         "dataFinal": end.strftime("%d/%m/%Y"),
     }
     try:
-        response = httpx.get(SGS_CDI_URL, params=params, timeout=10.0)
+        response = httpx.get(url, params=params, timeout=10.0)
         response.raise_for_status()
         rows = json.loads(response.text)
     except (httpx.HTTPError, json.JSONDecodeError) as exc:
-        raise QuoteFetchError(f"SGS CDI request failed: {exc}") from exc
+        raise QuoteFetchError(f"SGS {label} request failed: {exc}") from exc
     rates: dict[date, Decimal] = {}
     for row in rows:
         try:
@@ -71,8 +81,87 @@ def fetch_cdi_rates(ticker: str, start: date, end: date) -> dict[date, Decimal]:
         except (KeyError, ValueError):
             continue
     if not rates:
-        raise QuoteFetchError("SGS returned no CDI rates")
+        raise QuoteFetchError(f"SGS returned no {label} rates")
     return rates
+
+
+def fetch_cdi_rates(ticker: str, start: date, end: date) -> dict[date, Decimal]:
+    return _fetch_sgs_series(SGS_CDI_URL, "CDI", start, end)
+
+
+def fetch_ipca_rates(ticker: str, start: date, end: date) -> dict[date, Decimal]:
+    """Monthly IPCA variation (%), one value per month dated the first day
+    of the reference month (SGS series 433)."""
+    return _fetch_sgs_series(SGS_IPCA_URL, "IPCA", start, end)
+
+
+def _annualized_daily_factor(annual_pct: Decimal, day_count: int = BUSINESS_DAYS_PER_YEAR) -> Decimal:
+    """Daily compounding factor for a fixed annual rate (e.g. 6 for +6%
+    a.a.), using the 252 business-day convention (same base as CDI)."""
+    daily = (1.0 + float(annual_pct) / 100.0) ** (1.0 / day_count)
+    return Decimal(str(daily))
+
+
+def _monthly_daily_factor(monthly_pct: Decimal, day: date) -> Decimal:
+    """Daily compounding factor equivalent to `monthly_pct`, spread evenly
+    across the calendar days of `day`'s month."""
+    days_in_month = calendar.monthrange(day.year, day.month)[1]
+    daily = (1.0 + float(monthly_pct) / 100.0) ** (1.0 / days_in_month)
+    return Decimal(str(daily))
+
+
+def _ipca_plus_index(
+    ipca_monthly: dict[date, Decimal], days: list[date], addon_annual_pct: Decimal
+) -> list[Decimal | None]:
+    if not ipca_monthly:
+        return [None] * len(days)
+    monthly_factor = {
+        date(when.year, when.month, 1): _monthly_daily_factor(rate, when)
+        for when, rate in ipca_monthly.items()
+    }
+    addon = _annualized_daily_factor(addon_annual_pct)
+    factor = Decimal("1")
+    current: Decimal | None = None
+    out: list[Decimal | None] = []
+    for day in days:
+        month_key = date(day.year, day.month, 1)
+        if month_key in monthly_factor:
+            current = monthly_factor[month_key]
+        if current is None:
+            out.append(None)
+            continue
+        # IPCA spreads over every calendar day of the month (it is a
+        # calendar-time figure); the +6% a.a. add-on accrues only on
+        # business days (252/year convention).
+        factor *= current
+        if day.weekday() < 5:
+            factor *= addon
+        out.append(HUNDRED * factor)
+    return out
+
+
+def _fx_plus_index(
+    fx_series: dict[date, Decimal], days: list[date], addon_annual_pct: Decimal
+) -> list[Decimal | None]:
+    if not fx_series:
+        return [None] * len(days)
+    addon = _annualized_daily_factor(addon_annual_pct)
+    carried = _carry_forward(fx_series, days)
+    factor = Decimal("1")
+    prev: Decimal | None = None
+    out: list[Decimal | None] = []
+    for day, value in zip(days, carried):
+        if value is None:
+            out.append(None)
+            prev = None
+            continue
+        if prev is not None:
+            factor *= value / prev
+            if day.weekday() < 5:
+                factor *= addon
+        prev = value
+        out.append(HUNDRED * factor)
+    return out
 
 
 ALL_BENCHMARKS = ("cdi", "ibov", "sp500", "btc")
@@ -164,6 +253,22 @@ def benchmark_index_series(
             benchmarks["btc"] = _price_index(_carry_forward(btc, days))
         else:
             warnings.append("BTC indisponível (Binance)")
+
+    if "ipca6" in keys:
+        ipca_rates = get_daily_closes(
+            db, "IPCA", None, start, end, fetcher=fetch_ipca_rates, currency="BRL", source="sgs"
+        )
+        if ipca_rates:
+            benchmarks["ipca6"] = _ipca_plus_index(ipca_rates, days, Decimal("6"))
+        else:
+            warnings.append("IPCA+6 indisponível (SGS)")
+
+    if "dolar5" in keys:
+        fx_series = get_usd_brl_series(db, start, end)
+        if fx_series:
+            benchmarks["dolar5"] = _fx_plus_index(fx_series, days, Decimal("5"))
+        else:
+            warnings.append("Dólar+5 indisponível (PTAX)")
 
     return benchmarks, warnings
 

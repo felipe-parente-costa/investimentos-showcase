@@ -203,8 +203,8 @@ def get_portfolio_returns(
     """Cumulative return (TWR) per segment and optional benchmarks, each
     rebased to 0% at the start of the requested period. `segments` and
     `benchmarks` are comma-separated keys (total,br,us,crypto,rf and
-    cdi,ibov,sp500,btc). `currency=USD` values the EUA/Cripto segments in
-    dollars (return in the asset's native currency)."""
+    cdi,ibov,sp500,btc,ipca6,dolar5). `currency=USD` values the EUA/Cripto
+    segments in dollars (return in the asset's native currency)."""
     seg_keys = [s for s in segments.split(",") if s.strip()]
     bm_keys = [b for b in benchmarks.split(",") if b.strip()]
     result = build_returns(db, seg_keys, bm_keys, period, currency)

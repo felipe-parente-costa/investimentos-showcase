@@ -67,6 +67,8 @@
   --color-data-ibov: #82b4ef;
   --color-data-sp500: #ec8c5f;
   --color-data-btc: #e58aab;
+  --color-data-ipca6: #e1bc73;
+  --color-data-dolar5: #8f7ee0;
 
   /* Par de contraste local do gráfico de Aportes×Rendimentos (aporte = cinza
      quente slate-400; rendimento = teal apagado abaixo) — de propósito FORA
@@ -123,6 +125,8 @@
   --color-data-ibov: #8fa8c9;
   --color-data-sp500: #c99a7f;
   --color-data-btc: #c98fa0;
+  --color-data-ipca6: #d4aa58;
+  --color-data-dolar5: #9990c4;
 
   --color-contrib-yield: #177a63;
 
