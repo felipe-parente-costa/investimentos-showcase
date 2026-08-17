@@ -72,16 +72,6 @@ FAILURE_BACKOFF_WINDOW = timedelta(hours=24)
 # The frozen series is harmless: valuation after the holding window
 # multiplies a zero quantity. Being listed here skips the external fetch
 # entirely; the cached series still serves reads. Map ticker -> reason, e.g.
-# A close is "off scale" when it moves by this factor in one observation
-# and comes back within SPIKE_MAX_DAYS — the shape of a source glitch, not
-# of a split (one-way) or a market move. Three is far above anything a
-# market does in a day (crypto's worst day in the book is under 30%) and
-# far below the 100x scaling errors seen from the price source.
-SPIKE_FACTOR = Decimal("3")
-SPIKE_LOW = Decimal("1") / SPIKE_FACTOR
-SPIKE_MAX_DAYS = 5
-SPIKE_TOLERANCE = Decimal("0.25")
-
 # {"OLDT3": "renamed to NEWT3; symbol extinct at the sources"}.
 DEAD_HISTORY_TICKERS: dict[str, str] = {}
 
@@ -627,72 +617,6 @@ def _sample(points: list[HistoryPoint], granularity: Granularity) -> list[Histor
     return list(sampled.values())
 
 
-def _drop_scale_spikes(
-    ticker: str, series: dict[date, Decimal]
-) -> dict[date, Decimal]:
-    """Drop closes that leave the price scale and come back — a source
-    glitch, never a market move.
-
-    The signature is a round trip: the price jumps by a factor of
-    SPIKE_FACTOR or more, sits at the new scale for at most
-    SPIKE_MAX_DAYS observations, then returns to where it left. A split
-    or a grouping is the opposite shape — a one-way step that never comes
-    back — so it is left untouched, which is what keeps every real event
-    in a book safe: sweeping a full quote history, every jump above 50%
-    turned out to be a split or a grouping, and none of them reverted.
-
-    Observed with XPML11: yfinance served three closes around R$ 1,07
-    between two of ~R$ 110, and the -99% / +10.198% pair that creates
-    read as 10.184% annual volatility for the ticker and 586% for its
-    whole sector basket. Dropping the days lets the previous
-    close carry forward, which is what the engine already does for a
-    holiday. Never silent: each drop is logged with the dates and values.
-    """
-    if len(series) < 3:
-        return series
-    days = sorted(series)
-    keep = dict(series)
-    i = 1
-    while i < len(days):
-        before, at = series[days[i - 1]], series[days[i]]
-        if before <= 0 or at <= 0:
-            i += 1
-            continue
-        ratio = at / before
-        if SPIKE_LOW < ratio < SPIKE_FACTOR:
-            i += 1
-            continue
-        # Off scale. Find the day it comes back, within the window.
-        end_of_spike = None
-        for j in range(i + 1, min(i + 1 + SPIKE_MAX_DAYS, len(days))):
-            back = series[days[j]]
-            if back <= 0:
-                break
-            if abs(back / before - 1) <= SPIKE_TOLERANCE:
-                end_of_spike = j
-                break
-            if abs(back / at - 1) > SPIKE_TOLERANCE:
-                break  # moved again: a trend, not a plateau off scale
-        if end_of_spike is None:
-            i += 1  # one-way step: a split or a real move, keep it
-            continue
-        dropped = days[i:end_of_spike]
-        for d in dropped:
-            del keep[d]
-        logger.warning(
-            "%s: dropping %d close(s) off the price scale (%s), "
-            "%s before and %s after — source glitch, carrying the "
-            "previous close forward",
-            ticker,
-            len(dropped),
-            ", ".join(f"{d} {series[d]}" for d in dropped),
-            before,
-            series[days[end_of_spike]],
-        )
-        i = end_of_spike + 1
-    return keep
-
-
 def _cached_closes(
     db: Session, ticker: str, start: date, end: date
 ) -> dict[date, Decimal]:
@@ -708,7 +632,7 @@ def _cached_closes(
         )
         .order_by(Quote.date, Quote.fetched_at)
     ).all()
-    return _drop_scale_spikes(ticker, {row.date: row.close_price for row in rows})
+    return {row.date: row.close_price for row in rows}
 
 
 def _covers(series: dict[date, Decimal], start: date, end: date) -> bool:
