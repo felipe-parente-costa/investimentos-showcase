@@ -178,7 +178,12 @@ export default function RiskGroupsSection({
       {!error && groups !== null && (
         <>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <AllocationDonut title="Alocação" slices={donutSlices} maxSlices={8} />
+            <AllocationDonut
+              title={`Alocação por ${groupBy === 'sector' ? 'setor' : 'sub-setor'}`}
+              slices={donutSlices}
+              maxSlices={8}
+              size="lg"
+            />
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[480px] text-sm">

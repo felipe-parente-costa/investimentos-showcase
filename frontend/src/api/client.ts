@@ -535,11 +535,37 @@ export function getCapm(period: CapmPeriod = '1A'): Promise<CapmResponse> {
   return request<CapmResponse>(`/portfolio/capm?period=${period}`)
 }
 
-export type RiskPeriod = '3M' | '6M' | '1A' | '2A' | 'MAX'
+export type RiskPeriod = '3M' | '6M' | 'YTD' | '1A' | '2A' | 'MAX'
+export interface VarHorizon {
+  days: number
+  label: string
+  var_hist_95_pct: number | null
+  var_hist_95_brl: string | null
+  var_hist_99_pct: number | null
+  var_hist_99_brl: string | null
+  cvar_hist_95_pct: number | null
+  cvar_hist_95_brl: string | null
+}
+
+export interface BenchmarkComparison {
+  key: string
+  label: string
+  months: number
+  up_months: number
+  down_months: number
+  upside_capture: number | null
+  downside_capture: number | null
+  batting_average: number | null
+  active_return_annual_pct: number | null
+  tracking_error_annual_pct: number | null
+  information_ratio: number | null
+}
+
 export type RiskGroupBy = 'sector' | 'subsector'
 
 export interface RiskOverall {
   volatility_annual_pct: number | null
+  trading_observations: number
   sharpe: number | null
   sortino: number | null
   max_drawdown_pct: number | null
@@ -623,6 +649,35 @@ export interface FixedIncomeRisk {
   hhi_institution: number | null
 }
 
+export interface RiskReturnPoint {
+  key: string
+  label: string
+  kind: 'asset' | 'group' | 'segment' | 'portfolio' | 'benchmark'
+  volatility_annual_pct: number
+  return_annual_pct: number
+  sharpe: number | null
+  return_period_pct: number | null
+  weight_pct: number | null
+  market_value_brl: string | null
+  segment: string | null
+  asset_class: string | null
+  sector: string | null
+  subsector: string | null
+  observations: number
+  first_date: string | null
+  partial_window: boolean
+}
+
+export interface RiskReturn {
+  risk_free_label: string
+  risk_free_annual_pct: number | null
+  assets: RiskReturnPoint[]
+  groups: RiskReturnPoint[]
+  segments: RiskReturnPoint[]
+  portfolio: RiskReturnPoint | null
+  benchmarks: RiskReturnPoint[]
+}
+
 export interface RiskResponse {
   period: string
   period_label: string
@@ -635,6 +690,9 @@ export interface RiskResponse {
   groups: RiskGroup[]
   group_correlation: GroupCorrelation
   risk_universe_coverage_pct: number | null
+  var_horizons: VarHorizon[]
+  benchmark_comparison: BenchmarkComparison[]
+  risk_return: RiskReturn
   stress_scenarios: StressScenario[]
   fixed_income: FixedIncomeRisk | null
   warnings: string[]

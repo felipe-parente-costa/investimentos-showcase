@@ -33,6 +33,10 @@ from app.schemas.portfolio import (
     RiskOut,
     RiskOverallOut,
     RiskPointOut,
+    RiskReturnOut,
+    RiskReturnPointOut,
+    BenchmarkComparisonOut,
+    VarHorizonOut,
     SegmentOut,
     SegmentSummaryOut,
     StressScenarioOut,
@@ -322,6 +326,23 @@ def get_portfolio_risk(
             labels=result.group_correlation.labels, matrix=result.group_correlation.matrix
         ),
         risk_universe_coverage_pct=result.risk_universe_coverage_pct,
+        var_horizons=[VarHorizonOut(**vars(v)) for v in result.var_horizons],
+        benchmark_comparison=[
+            BenchmarkComparisonOut(**vars(b)) for b in result.benchmark_comparison
+        ],
+        risk_return=RiskReturnOut(
+            risk_free_label=result.risk_return.risk_free_label,
+            risk_free_annual_pct=result.risk_return.risk_free_annual_pct,
+            assets=[RiskReturnPointOut(**vars(p)) for p in result.risk_return.assets],
+            groups=[RiskReturnPointOut(**vars(p)) for p in result.risk_return.groups],
+            segments=[RiskReturnPointOut(**vars(p)) for p in result.risk_return.segments],
+            portfolio=(
+                RiskReturnPointOut(**vars(result.risk_return.portfolio))
+                if result.risk_return.portfolio is not None
+                else None
+            ),
+            benchmarks=[RiskReturnPointOut(**vars(p)) for p in result.risk_return.benchmarks],
+        ),
         stress_scenarios=[StressScenarioOut(**vars(s)) for s in result.stress_scenarios],
         fixed_income=(
             FixedIncomeRiskOut(

@@ -45,7 +45,19 @@ interface Props {
 }
 
 export default function ReturnHistogram({ returns, error, skewness, kurtosisExcess }: Props) {
-  const bins = useMemo(() => histogram((returns ?? []).map((p) => p.value), BINS), [returns])
+  // Dias de negociação apenas: é a grade em que assimetria e curtose (no
+  // canto deste mesmo card) são calculadas, e um monte de sábados parados
+  // desenharia uma barra falsa no zero.
+  const bins = useMemo(
+    () =>
+      histogram(
+        (returns ?? [])
+          .filter((p) => new Date(`${p.date}T12:00:00`).getDay() % 6 !== 0)
+          .map((p) => p.value),
+        BINS,
+      ),
+    [returns],
+  )
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
@@ -53,7 +65,7 @@ export default function ReturnHistogram({ returns, error, skewness, kurtosisExce
         <div>
           <p className="text-section">Distribuição dos retornos diários</p>
           <p className="text-xs text-slate-500">
-            Verde = dias de alta, vermelho = dias de baixa, no período selecionado.
+            Verde = dias de alta, vermelho = dias de baixa. Só dias de negociação — a mesma grade da assimetria e da curtose ao lado.
           </p>
         </div>
         <div className="flex gap-4 text-xs text-slate-400">

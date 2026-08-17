@@ -96,6 +96,27 @@ export const BENCHMARK_COLORS: Record<string, string> = {
   dolar5: 'var(--color-data-dolar5)', // violeta — sem seção-par
 }
 
+// Faixas de Sharpe do gráfico Risco × Retorno. Escala de ESTADO (ruim -> bom),
+// não de categoria: por isso fica fora do DONUT_PALETTE e nunca é usada como
+// identidade de série. A `shape` não é decoração — é a codificação secundária
+// obrigatória: uma rampa vermelho->verde de 4 degraus não separa a fronteira
+// do zero nem para visão normal (ΔE 2,2 no par laranja×oliva do tema claro),
+// e é exatamente essa fronteira que a forma resolve. Ver o bloco de tokens no
+// index.css para os números da validação.
+export const SHARPE_BANDS = [
+  { min: -Infinity, max: 0, color: 'var(--color-sharpe-neg)', ink: 'var(--color-sharpe-neg-ink)', shape: 'down' as const, label: 'abaixo de 0' },
+  { min: 0, max: 0.5, color: 'var(--color-sharpe-low)', ink: 'var(--color-sharpe-low-ink)', shape: 'circle' as const, label: '0 a 0,5' },
+  { min: 0.5, max: 1, color: 'var(--color-sharpe-mid)', ink: 'var(--color-sharpe-mid-ink)', shape: 'circle' as const, label: '0,5 a 1' },
+  { min: 1, max: Infinity, color: 'var(--color-sharpe-high)', ink: 'var(--color-sharpe-high-ink)', shape: 'circle' as const, label: '1 ou mais' },
+] as const
+
+export type SharpeBand = (typeof SHARPE_BANDS)[number]
+
+export function sharpeBand(sharpe: number | null): SharpeBand | null {
+  if (sharpe === null) return null
+  return SHARPE_BANDS.find((b) => sharpe >= b.min && sharpe < b.max) ?? null
+}
+
 // Cor fixa de uma classe de ativo. Ações dividem por região (`market`):
 // BR=dourado, US=laranja; demais classes independem de região.
 export function classColor(assetClass: string, market?: string): string {

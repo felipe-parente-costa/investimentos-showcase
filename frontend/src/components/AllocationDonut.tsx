@@ -23,6 +23,11 @@ interface Props {
   maxSlices?: number
   // Conteúdo opcional à direita do título (ex.: chips de filtro).
   headerRight?: ReactNode
+  // "lg" ocupa um card inteiro: donut mais alto e legenda própria embaixo,
+  // em grade com valor e percentual. A legenda do recharts é uma fileira
+  // que quebra em linhas desalinhadas e desperdiça a largura — serve para o
+  // donut pequeno do Dashboard, não para um card só dele.
+  size?: 'md' | 'lg'
 }
 
 export default function AllocationDonut({
@@ -31,7 +36,9 @@ export default function AllocationDonut({
   currency = 'BRL',
   maxSlices = DONUT_PALETTE.length,
   headerRight,
+  size = 'md',
 }: Props) {
+  const large = size === 'lg'
   const sorted = [...slices].sort((a, b) => b.value - a.value)
   // "Outros" só aparece com MAIS que maxSlices fatias; com ≤ maxSlices, todas
   // nomeadas, sem cinza. O excedente vira uma fatia única com seus membros.
@@ -155,15 +162,15 @@ export default function AllocationDonut({
         <p className="text-sm text-slate-400">{title}</p>
         {headerRight}
       </div>
-      <div className="h-64">
+      <div className={large ? 'h-80' : 'h-64'}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               dataKey="value"
               nameKey="label"
-              innerRadius="55%"
-              outerRadius="80%"
+              innerRadius={large ? '48%' : '55%'}
+              outerRadius={large ? '86%' : '80%'}
               paddingAngle={2}
               stroke="none"
               label={renderDirectLabel}
@@ -177,14 +184,40 @@ export default function AllocationDonut({
               ))}
             </Pie>
             <Tooltip content={renderTooltip} wrapperStyle={{ pointerEvents: 'auto' }} />
-            <Legend
-              formatter={(value: string) => (
-                <span className="text-xs text-slate-300">{value}</span>
-              )}
-            />
+            {!large && (
+              <Legend
+                formatter={(value: string) => (
+                  <span className="text-xs text-slate-300">{value}</span>
+                )}
+              />
+            )}
           </PieChart>
         </ResponsiveContainer>
       </div>
+
+      {large && (
+        <ul className="mt-4 space-y-1.5 border-t border-slate-800 pt-4 text-sm">
+          {data.map((slice, index) => (
+            <li key={slice.label} className="flex items-baseline gap-2">
+              <span
+                aria-hidden
+                className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                style={{
+                  backgroundColor:
+                    slice.color ?? DONUT_PALETTE[index % DONUT_PALETTE.length],
+                }}
+              />
+              <span className="min-w-0 flex-1 truncate text-slate-300">{slice.label}</span>
+              <span className="w-14 shrink-0 text-right tabular-nums text-slate-300">
+                {pct(slice.value)}
+              </span>
+              <span className="w-32 shrink-0 text-right tabular-nums text-slate-500">
+                {formatMoney(String(slice.value), currency)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

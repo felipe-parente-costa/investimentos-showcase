@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import type { RiskOverall } from '../api/client'
+import { useState, type ReactNode } from 'react'
+import type { RiskOverall, VarHorizon } from '../api/client'
 import { formatMoney, formatPercent } from '../lib/format'
 
 const coefFormatter = new Intl.NumberFormat('pt-BR', {
@@ -45,12 +45,23 @@ function Metric({
   )
 }
 
-function Group({ title, children }: { title: string; children: ReactNode }) {
+function Group({
+  title,
+  children,
+  headerRight,
+}: {
+  title: string
+  children: ReactNode
+  headerRight?: ReactNode
+}) {
   return (
     <div>
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-        {title}
-      </p>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          {title}
+        </p>
+        {headerRight}
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{children}</div>
     </div>
   )
@@ -59,11 +70,23 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 interface Props {
   overall: RiskOverall
   periodLabel: string
+  varHorizons: VarHorizon[]
 }
 
-export default function RiskSummaryCards({ overall, periodLabel }: Props) {
+export default function RiskSummaryCards({ overall, periodLabel, varHorizons }: Props) {
   const o = overall
   const notEnoughData = o.observations < 20
+  // Horizon (how long the loss has to happen in) is a different knob from
+  // the window above (how much history feeds the estimate). Default 1 day.
+  const [horizonDays, setHorizonDays] = useState(1)
+  const horizon = varHorizons.find((h) => h.days === horizonDays) ?? varHorizons[0]
+  const v = horizon ?? {
+    var_hist_95_pct: o.var_hist_95_pct,
+    var_hist_99_pct: o.var_hist_99_pct,
+    cvar_hist_95_pct: o.cvar_hist_95_pct,
+    var_hist_95_brl: o.var_hist_95_brl,
+    cvar_hist_95_brl: o.cvar_hist_95_brl,
+  }
 
   return (
     <div className="space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-6">
@@ -98,7 +121,30 @@ export default function RiskSummaryCards({ overall, periodLabel }: Props) {
         </Metric>
       </Group>
 
-      <Group title="Perdas extremas (1 dia)">
+      <Group
+        title="Perdas extremas (dia de negociação)"
+        headerRight={
+          varHorizons.length > 0 ? (
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] normal-case text-slate-500">Horizonte:</span>
+              {varHorizons.map((h) => (
+                <button
+                  key={h.days}
+                  type="button"
+                  onClick={() => setHorizonDays(h.days)}
+                  className={`rounded-md px-2 py-0.5 text-[11px] ${
+                    horizonDays === h.days
+                      ? 'bg-slate-700 text-slate-100'
+                      : 'text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  {h.label}
+                </button>
+              ))}
+            </div>
+          ) : undefined
+        }
+      >
         <Metric
           label="Máx. drawdown"
           hint={
@@ -129,19 +175,19 @@ export default function RiskSummaryCards({ overall, periodLabel }: Props) {
             {o.current_drawdown_pct != null ? formatPercent(o.current_drawdown_pct) : '—'}
           </span>
         </Metric>
-        <Metric label="VaR histórico 95%">
-          <span className={lossColor(o.var_hist_95_pct)}>
-            {o.var_hist_95_pct != null ? formatPercent(o.var_hist_95_pct) : '—'}
+        <Metric label="VaR histórico 95%" hint={horizon?.label}>
+          <span className={lossColor(v.var_hist_95_pct)}>
+            {v.var_hist_95_pct != null ? formatPercent(v.var_hist_95_pct) : '—'}
           </span>
         </Metric>
-        <Metric label="VaR histórico 99%">
-          <span className={lossColor(o.var_hist_99_pct)}>
-            {o.var_hist_99_pct != null ? formatPercent(o.var_hist_99_pct) : '—'}
+        <Metric label="VaR histórico 99%" hint={horizon?.label}>
+          <span className={lossColor(v.var_hist_99_pct)}>
+            {v.var_hist_99_pct != null ? formatPercent(v.var_hist_99_pct) : '—'}
           </span>
         </Metric>
         <Metric label="CVaR 95%" hint="perda média além do VaR">
-          <span className={lossColor(o.cvar_hist_95_pct)}>
-            {o.cvar_hist_95_pct != null ? formatPercent(o.cvar_hist_95_pct) : '—'}
+          <span className={lossColor(v.cvar_hist_95_pct)}>
+            {v.cvar_hist_95_pct != null ? formatPercent(v.cvar_hist_95_pct) : '—'}
           </span>
         </Metric>
         <Metric label="VaR paramétrico 95%" hint="normal">
@@ -149,18 +195,33 @@ export default function RiskSummaryCards({ overall, periodLabel }: Props) {
             {o.var_parametric_95_pct != null ? formatPercent(o.var_parametric_95_pct) : '—'}
           </span>
         </Metric>
-        <Metric label="VaR 95% em R$">
-          <span className={lossColor(o.var_hist_95_brl != null ? Number(o.var_hist_95_brl) : null)}>
-            {o.var_hist_95_brl != null ? formatMoney(o.var_hist_95_brl) : '—'}
+        <Metric label="VaR 95% em R$" hint={horizon?.label}>
+          <span className={lossColor(v.var_hist_95_brl != null ? Number(v.var_hist_95_brl) : null)}>
+            {v.var_hist_95_brl != null ? formatMoney(v.var_hist_95_brl) : '—'}
           </span>
         </Metric>
-        <Metric label="CVaR 95% em R$">
+        <Metric label="CVaR 95% em R$" hint={horizon?.label}>
           <span
-            className={lossColor(o.cvar_hist_95_brl != null ? Number(o.cvar_hist_95_brl) : null)}
+            className={lossColor(v.cvar_hist_95_brl != null ? Number(v.cvar_hist_95_brl) : null)}
           >
-            {o.cvar_hist_95_brl != null ? formatMoney(o.cvar_hist_95_brl) : '—'}
+            {v.cvar_hist_95_brl != null ? formatMoney(v.cvar_hist_95_brl) : '—'}
           </span>
         </Metric>
+        <p className="col-span-2 text-[11px] text-slate-500 sm:col-span-3 lg:col-span-4">
+          VaR, CVaR, assimetria e curtose usam os {o.trading_observations} dias de
+          negociação da janela, não os {o.observations} dias corridos: "um dia" num
+          relatório de risco é um dia de pregão, e incluir fim de semana empurra o
+          quantil para o meio da distribuição. Volatilidade e Sharpe acima seguem na
+          série cheia — lá o fim de semana carrega retorno de cripto que não pode ser
+          descartado.
+        </p>
+        {horizonDays > 1 && (
+          <p className="col-span-2 text-[11px] text-slate-500 sm:col-span-3 lg:col-span-4">
+            Horizonte de {horizon?.label} pela regra da raiz do tempo (VaR₁ × √{horizonDays}),
+            que supõe retornos independentes e ignora a tendência — vale para poucos dias,
+            não para meses longos. A perda de 1 dia é a medida direta.
+          </p>
+        )}
       </Group>
 
       <Group title="Sensibilidade a mercado">

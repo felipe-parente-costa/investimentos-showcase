@@ -6,14 +6,17 @@ import RollingVolatilityChart from '../components/RollingVolatilityChart'
 import ReturnHistogram from '../components/ReturnHistogram'
 import StressScenarios from '../components/StressScenarios'
 import RiskGroupsSection from '../components/RiskGroupsSection'
+import RiskReturnScatter from '../components/RiskReturnScatter'
+import BenchmarkComparison from '../components/BenchmarkComparison'
 import FixedIncomeRiskCard from '../components/FixedIncomeRiskCard'
 import CorrelationExplorer from '../components/CorrelationExplorer'
 import { SkeletonChart } from '../components/Skeleton'
 
-const PERIODS: RiskPeriod[] = ['3M', '6M', '1A', '2A', 'MAX']
+const PERIODS: RiskPeriod[] = ['3M', '6M', 'YTD', '1A', '2A', 'MAX']
 const PERIOD_LABELS: Record<RiskPeriod, string> = {
   '3M': '3M',
   '6M': '6M',
+  YTD: 'No ano',
   '1A': '1A',
   '2A': '2A',
   MAX: 'Desde o início',
@@ -86,7 +89,11 @@ export default function Risco() {
 
       {!error && data !== null && (
         <>
-          <RiskSummaryCards overall={data.overall} periodLabel={data.period_label} />
+          <RiskSummaryCards
+            overall={data.overall}
+            periodLabel={data.period_label}
+            varHorizons={data.var_horizons}
+          />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <DrawdownChart points={data.drawdown_series} error={false} />
@@ -97,11 +104,23 @@ export default function Risco() {
             />
           </div>
 
+          <RiskReturnScatter
+            data={data.risk_return}
+            groupBy={groupBy}
+            onGroupByChange={setGroupBy}
+            periodLabel={data.period_label}
+          />
+
           <ReturnHistogram
             returns={data.daily_returns}
             error={false}
             skewness={data.overall.skewness}
             kurtosisExcess={data.overall.kurtosis_excess}
+          />
+
+          <BenchmarkComparison
+            comparisons={data.benchmark_comparison}
+            periodLabel={data.period_label}
           />
 
           <StressScenarios scenarios={data.stress_scenarios} />

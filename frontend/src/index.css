@@ -70,6 +70,41 @@
   --color-data-ipca6: #e1bc73;
   --color-data-dolar5: #8f7ee0;
 
+  /* Faixas de Sharpe do gráfico Risco × Retorno (escala de ESTADO, não
+     categoria: ruim -> bom). Não sai dos mapas de colors.ts por acaso — é
+     qualidade de um número, não identidade de uma seção.
+     Uma escala vermelho->verde de 4 degraus NÃO passa nos seis checks só na
+     cor: no escuro a banda de luminosidade permitida (L 0,48–0,67) não
+     comporta 4 degraus separados, e no claro o par laranja×oliva fica em
+     ΔE 2,2 (deutan). Por isso a FORMA do marcador carrega o sinal do Sharpe
+     (triângulo p/ baixo abaixo de zero, círculo acima) — e é exatamente esse
+     o par que a cor não separa. Tons revistos em 2026-08-10 para ficarem mais
+     vivos: o croma já estava no limite do gamut, então o que subiu foi a
+     LUMINOSIDADE (é o que lê como "vivo" na tela), buscando o conjunto mais
+     claro que ainda mantivesse margem confortável — CVD ΔE 11,0–11,7 e visão
+     normal 18,0–19,3 nos pares de mesma forma, não no piso de 15. Revalidar
+     com validate_palette.js se qualquer tom mudar. */
+  --color-sharpe-neg: #da154f;
+  --color-sharpe-low: #d07f24;
+  --color-sharpe-mid: #797414;
+  --color-sharpe-high: #18b23a;
+  /* Tinta da sigla DENTRO da bolha, escolhida por faixa pelo contraste
+     medido contra a própria cor (não por tema): 4,47 / 6,00 / 4,35 / 6,65:1.
+     Uma tinta única reprovaria em metade das faixas. */
+  --color-sharpe-neg-ink: #f7f2e6;
+  --color-sharpe-low-ink: #14120f;
+  --color-sharpe-mid-ink: #f7f2e6;
+  --color-sharpe-high-ink: #14120f;
+
+  /* Renda Fixa no gráfico Risco × Retorno: roxo em vez do verde-água que a
+     seção usa no resto do app. Motivo medido, não gosto: é o ÚNICO gráfico
+     onde a identidade de seção e as faixas de Sharpe aparecem juntas, e o
+     verde-água da RF (#199e70) fica a ΔE 9,8 do verde da faixa "1 ou mais"
+     — abaixo do corte de 15, ou seja, confundem-se para quem enxerga tudo.
+     Este roxo fica a ΔE 19,3 do azul (Brasil) e 18,2 do rosa (Cripto). Nas
+     outras telas a RF continua verde-água. */
+  --color-segment-rf: #9b3fd0;
+
   /* Par de contraste local do gráfico de Aportes×Rendimentos (aporte = cinza
      quente slate-400; rendimento = teal apagado abaixo) — de propósito FORA
      dos mapas centrais de colors.ts (não é identidade de seção/categoria). */
@@ -127,6 +162,23 @@
   --color-data-btc: #c98fa0;
   --color-data-ipca6: #d4aa58;
   --color-data-dolar5: #9990c4;
+
+  /* Faixas de Sharpe no claro: mesma estrutura, tons próprios validados
+     contra #faf7f0 (não é o espelho do escuro). A luminosidade inverte de
+     direção dentro de cada forma — no claro "melhor" é mais ESCURO, que é o
+     que ganha presença contra a página. */
+  --color-sharpe-neg: #a8022b;
+  --color-sharpe-low: #d97400;
+  --color-sharpe-mid: #999300;
+  --color-sharpe-high: #006600;
+  /* 6,94 / 5,74 / 5,81 / 6,48:1 — a faixa do meio inverte de tinta em
+     relação ao escuro, por isso os tokens são por tema. */
+  --color-sharpe-neg-ink: #f7f2e6;
+  --color-sharpe-low-ink: #14120f;
+  --color-sharpe-mid-ink: #14120f;
+  --color-sharpe-high-ink: #f7f2e6;
+
+  --color-segment-rf: #6b1ba5;
 
   --color-contrib-yield: #177a63;
 

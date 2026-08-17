@@ -146,6 +146,7 @@ class SegmentOut(BaseModel):
 
 class RiskOverallOut(BaseModel):
     volatility_annual_pct: float | None = None
+    trading_observations: int = 0
     sharpe: float | None = None
     sortino: float | None = None
     max_drawdown_pct: float | None = None
@@ -229,6 +230,60 @@ class FixedIncomeRiskOut(BaseModel):
     hhi_institution: float | None = None
 
 
+class VarHorizonOut(BaseModel):
+    days: int
+    label: str
+    var_hist_95_pct: float | None = None
+    var_hist_95_brl: Decimal | None = None
+    var_hist_99_pct: float | None = None
+    var_hist_99_brl: Decimal | None = None
+    cvar_hist_95_pct: float | None = None
+    cvar_hist_95_brl: Decimal | None = None
+
+
+class BenchmarkComparisonOut(BaseModel):
+    key: str
+    label: str
+    months: int
+    up_months: int
+    down_months: int
+    upside_capture: float | None = None
+    downside_capture: float | None = None
+    batting_average: float | None = None
+    active_return_annual_pct: float | None = None
+    tracking_error_annual_pct: float | None = None
+    information_ratio: float | None = None
+
+
+class RiskReturnPointOut(BaseModel):
+    key: str
+    label: str
+    kind: str
+    volatility_annual_pct: float
+    return_annual_pct: float
+    sharpe: float | None = None
+    return_period_pct: float | None = None
+    weight_pct: float | None = None
+    market_value_brl: Decimal | None = None
+    segment: str | None = None
+    asset_class: str | None = None
+    sector: str | None = None
+    subsector: str | None = None
+    observations: int = 0
+    first_date: date | None = None
+    partial_window: bool = False
+
+
+class RiskReturnOut(BaseModel):
+    risk_free_label: str
+    risk_free_annual_pct: float | None = None
+    assets: list[RiskReturnPointOut]
+    groups: list[RiskReturnPointOut]
+    segments: list[RiskReturnPointOut]
+    portfolio: RiskReturnPointOut | None = None
+    benchmarks: list[RiskReturnPointOut]
+
+
 class RiskOut(BaseModel):
     period: str
     period_label: str
@@ -241,6 +296,9 @@ class RiskOut(BaseModel):
     groups: list[RiskGroupOut]
     group_correlation: GroupCorrelationOut
     risk_universe_coverage_pct: float | None = None
+    var_horizons: list[VarHorizonOut]
+    benchmark_comparison: list[BenchmarkComparisonOut]
+    risk_return: RiskReturnOut
     stress_scenarios: list[StressScenarioOut]
     fixed_income: FixedIncomeRiskOut | None = None
     warnings: list[str]

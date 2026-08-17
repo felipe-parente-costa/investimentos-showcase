@@ -3,13 +3,29 @@ now lives inside it as one of its analyses via the existing /portfolio/
 correlation endpoint — this module does not touch that one).
 
 Everything price-based (volatility, VaR/CVaR, drawdown, beta, sector/
-sub-setor volatility and risk contribution) is derived from two existing,
-already-computed series, never refit here:
+sub-setor volatility and risk contribution) is derived from the existing
+patrimony engine, never refit here. One `load_market_data` feeds both:
 
-- The whole-portfolio daily TWR index from `history.build_patrimony_history`
-  — the same series behind the Dashboard's "Rentabilidade total (TWR)".
-- Per-ticker cached closes via `history._cached_closes` (the same helper
-  `correlation.py` uses), for the sector/sub-setor basket series.
+- The whole-portfolio daily TWR index (`compute_value_and_twr` over every
+  transaction) — the same series behind the Dashboard's "Rentabilidade
+  total (TWR)".
+- One daily TWR series per ticker (the same engine over that ticker's
+  transactions, the pattern `capm.py` uses per segment), for the sector/
+  sub-setor basket series.
+
+Reading raw closes instead would get three things wrong at once, each
+measured before this was changed: it drops proventos (a dividend-heavy
+ticker can return twice as much with them as without, and every FII
+changes sign over a 1A window), it mixes currencies on one axis (a US
+position compounds differently in USD and in BRL, and a short-duration
+bond ETF that is almost flat natively carries the whole exchange-rate
+volatility in BRL), and it reads a split as a return (a 6:1 shows up as
+-83%). The engine has none of those: it prices in BRL, treats income as
+a flow, and applies splits to quantity — on a split day it records the
+real move, a fraction of a percent. Dividend-per-share is not derivable
+anyway (most `dividend` rows carry `quantity=0`; the broker statement
+records only the amount), so the engine is the only path to a
+total-return series.
 
 Renda fixa privada (CDB/LCI/LCA) is marked at cost, not mark-to-market —
 volatility/VaR/beta on it would be fabricated risk, so it is deliberately
@@ -36,33 +52,69 @@ from app.services.assets import get_asset_meta
 from app.services.benchmarks import benchmark_index_series
 from app.services.capm import _cdi_daily_returns, _index_daily_returns, build_capm
 from app.services.fx import FxResult, get_usd_brl
-from app.services.history import HistoryPoint, _cached_closes, build_patrimony_history
+from app.services.history import MarketData, compute_value_and_twr, load_market_data
 from app.services.indexer import resolve_indexer
 from app.services.portfolio import compute_positions
 from app.services.quotes import get_quote
-from app.services.segments import segment_of
+from app.services.segments import SEGMENT_KEYS, SEGMENT_LABELS, segment_of
 from app.services.tesouro import parse_bond_ticker
 
 ZERO = Decimal("0")
 CENTS = Decimal("0.01")
 
+# One grid for the whole module: every series here comes off the engine,
+# which carries a point for *every* calendar day — 366 observations in a
+# 1-year window, not 252 — so the annualisation factor is 365 and no
+# statistic drops a day. Weekends are not padding: with 13% of the book in
+# crypto they carry real moves, and over the last year the 115 days outside
+# the CDI calendar compounded to +0,808%. A statistic restricted to
+# business days reproduces +5,625% of the book's actual +6,479% for the
+# window; the full grid reproduces it exactly. Where a business-day input
+# is involved (the CDI), it contributes zero on the days it does not
+# exist, which is what it in fact pays.
+CALENDAR_DAYS = 365
+
+# ... com UMA exceção deliberada, e ela tem convenção própria: VaR, CVaR,
+# assimetria e curtose descrevem a forma da distribuição de perda de UM DIA,
+# e "um dia" num relatório de risco significa um dia de NEGOCIAÇÃO (Holton,
+# Value-at-Risk: "when a horizon is expressed in days without qualification,
+# these are understood to be trading days"; Basel usa 10 dias de negociação).
+# Não é incoerência com a grade acima — são perguntas diferentes: volatilidade
+# e Sharpe medem o CAMINHO do retorno (e descartar fim de semana perderia
+# +0,808%/ano de retorno real), enquanto o VaR é um quantil, não acumula nada.
+# Incluir os fins de semana empurra o corte de 5% para o meio da distribuição
+# (VaR 95% lia -0,95% em vez de -1,04%) e finge uma cauda gorda que é só o
+# acúmulo de zeros de sábado: a curtose caía de +1,35 para +0,25 ao usar só
+# dias úteis. Dia útil aqui é seg-sex — B3 e NYSE negociam nos mesmos dias da
+# semana, e feriado de um é dia útil do outro.
 TRADING_DAYS = 252
 MIN_OBS = 20  # minimum daily observations to report a statistic (matches capm.py)
 MIN_BASKET_OVERLAP = 10  # minimum shared dates to correlate/covary two baskets
 
-PERIODS = ("3M", "6M", "1A", "2A", "MAX")
+PERIODS = ("3M", "6M", "YTD", "1A", "2A", "MAX")
 PERIOD_DAYS = {"3M": 91, "6M": 182, "1A": 365, "2A": 730}
 PERIOD_LABEL = {
     "3M": "3 meses",
     "6M": "6 meses",
+    "YTD": "no ano",
     "1A": "1 ano",
     "2A": "2 anos",
     "MAX": "máximo",
 }
 
-# capm.py's own PERIODS has no "3M" (see app/services/capm.py); stress
-# scenarios need a CAPM-compatible window to fetch betas from.
-_CAPM_PERIOD_FALLBACK = {"3M": "6M"}
+# Horizontes do VaR/CVaR. O horizonte é OUTRA coisa que a janela de
+# estimação (o seletor de período): a janela diz quanto histórico alimenta a
+# conta, o horizonte diz em quanto tempo a perda pode acontecer. A conversão
+# é a regra da raiz do tempo (VaR_h = VaR_1 x sqrt(h)), que supõe retornos
+# independentes e ignora a tendência — vale para poucos dias e passa a mentir
+# em horizontes longos, por isso a lista para em 1 mês. Contados em dias de
+# NEGOCIAÇÃO (1 / 5 / 21), como o VaR de base e como o horizonte de 10 dias
+# de Basel.
+VAR_HORIZONS = ((1, "1 dia"), (5, "1 semana"), (21, "1 mês"))
+
+# capm.py's own PERIODS has no "3M" or "YTD" (see app/services/capm.py);
+# stress scenarios need a CAPM-compatible window to fetch betas from.
+_CAPM_PERIOD_FALLBACK = {"3M": "6M", "YTD": "6M"}
 
 GROUP_LEVELS = ("sector", "subsector")
 NO_CLASS_LABEL = "Sem classificação"
@@ -78,6 +130,7 @@ Z_95 = 1.6448536269514722  # one-tailed 95% normal quantile
 @dataclass
 class RiskOverall:
     volatility_annual_pct: float | None = None
+    trading_observations: int = 0
     sharpe: float | None = None
     sortino: float | None = None
     max_drawdown_pct: float | None = None
@@ -112,6 +165,22 @@ class RiskOverall:
 class RiskPoint:
     date: date
     value: float
+
+
+@dataclass
+class VarHorizon:
+    """VaR/CVaR at a horizon other than one day, by the square-root-of-time
+    rule. Kept as its own list instead of replacing the 1-day fields so the
+    cards stay comparable and the assumption is visible where it is used."""
+
+    days: int
+    label: str
+    var_hist_95_pct: float | None = None
+    var_hist_95_brl: Decimal | None = None
+    var_hist_99_pct: float | None = None
+    var_hist_99_brl: Decimal | None = None
+    cvar_hist_95_pct: float | None = None
+    cvar_hist_95_brl: Decimal | None = None
 
 
 @dataclass
@@ -169,6 +238,62 @@ class FixedIncomeRisk:
 
 
 @dataclass
+class BenchmarkComparison:
+    """The "versus benchmark" block every professional risk report carries:
+    upside/downside capture, batting average and information ratio.
+
+    These are **monthly** by definition — Morningstar's capture ratios are
+    the geometric average of the fund's monthly returns in the months the
+    index rose (or fell) over the index's own, and a batting average counts
+    months. Computing them on daily data would not be the same statistic
+    under a different name; it would be a different one.
+    """
+
+    key: str
+    label: str
+    months: int
+    up_months: int
+    down_months: int
+    upside_capture: float | None = None  # 1.0 = capturou 100% da alta
+    downside_capture: float | None = None
+    batting_average: float | None = None
+    active_return_annual_pct: float | None = None
+    tracking_error_annual_pct: float | None = None
+    information_ratio: float | None = None
+
+
+@dataclass
+class RiskReturnPoint:
+    key: str
+    label: str
+    kind: str  # "asset" | "group" | "segment" | "portfolio" | "benchmark"
+    volatility_annual_pct: float
+    return_annual_pct: float
+    sharpe: float | None = None
+    return_period_pct: float | None = None  # realised over the measured span
+    weight_pct: float | None = None
+    market_value_brl: Decimal | None = None
+    segment: str | None = None  # br | us | crypto | rf — for filtering
+    asset_class: str | None = None
+    sector: str | None = None
+    subsector: str | None = None
+    observations: int = 0
+    first_date: date | None = None
+    partial_window: bool = False
+
+
+@dataclass
+class RiskReturn:
+    risk_free_label: str = "CDI"
+    risk_free_annual_pct: float | None = None
+    assets: list[RiskReturnPoint] = field(default_factory=list)
+    groups: list[RiskReturnPoint] = field(default_factory=list)
+    segments: list[RiskReturnPoint] = field(default_factory=list)
+    portfolio: RiskReturnPoint | None = None
+    benchmarks: list[RiskReturnPoint] = field(default_factory=list)
+
+
+@dataclass
 class RiskResult:
     period: str
     period_label: str
@@ -181,6 +306,9 @@ class RiskResult:
     groups: list[RiskGroup] = field(default_factory=list)
     group_correlation: GroupCorrelation = field(default_factory=GroupCorrelation)
     risk_universe_coverage_pct: float | None = None
+    var_horizons: list[VarHorizon] = field(default_factory=list)
+    benchmark_comparison: list[BenchmarkComparison] = field(default_factory=list)
+    risk_return: RiskReturn = field(default_factory=RiskReturn)
     stress_scenarios: list[StressScenario] = field(default_factory=list)
     fixed_income: FixedIncomeRisk | None = None
     warnings: list[str] = field(default_factory=list)
@@ -203,7 +331,8 @@ def _sample_std(xs: list[float]) -> float | None:
 
 
 def _annualize_return(mean_daily: float) -> float:
-    return (1 + mean_daily) ** TRADING_DAYS - 1
+    """Compounds a mean daily return of the calendar-daily engine series."""
+    return (1 + mean_daily) ** CALENDAR_DAYS - 1
 
 
 def _covariance(a: dict[date, float], b: dict[date, float]) -> tuple[float, int] | None:
@@ -290,13 +419,15 @@ def _drawdown_series(index: list[float], dates: list[date]) -> list[RiskPoint]:
 def _rolling_volatility(
     returns: dict[date, float], dates: list[date], window: int
 ) -> list[RiskPoint]:
+    """Rolling volatility of the portfolio series — calendar-daily, so the
+    window is `window` calendar days and the factor is CALENDAR_DAYS."""
     ordered = [(d, returns[d]) for d in dates if d in returns]
     points: list[RiskPoint] = []
     for i in range(window - 1, len(ordered)):
         chunk = [r for _, r in ordered[i - window + 1 : i + 1]]
         std = _sample_std(chunk)
         if std is not None:
-            points.append(RiskPoint(ordered[i][0], std * math.sqrt(TRADING_DAYS)))
+            points.append(RiskPoint(ordered[i][0], std * math.sqrt(CALENDAR_DAYS)))
     return points
 
 
@@ -429,18 +560,47 @@ def _valued_positions(
 def _window_start(period: str, end: date) -> date:
     if period == "MAX":
         return date(2000, 1, 1)
+    if period == "YTD":
+        return date(end.year, 1, 1)
     return end - timedelta(days=PERIOD_DAYS[period])
 
 
-def _portfolio_returns(points: list[HistoryPoint]) -> dict[date, float]:
-    """Daily TWR returns of the whole consolidated portfolio, guarded the
-    same way capm.py guards a segment's: only days where both ends actually
-    held value, so the pre-existence flat lead-in injects no fake returns."""
+def _trading_only(returns: dict[date, float]) -> dict[date, float]:
+    """Weekdays only — the grid a one-day VaR is defined on."""
+    return {d: v for d, v in returns.items() if d.weekday() < 5}
+
+
+def _twr_returns(
+    totals: list[Decimal], twr: list[Decimal], days: list[date]
+) -> dict[date, float]:
+    """Daily TWR returns of whatever transaction subset produced `totals`/
+    `twr`, guarded the same way capm.py guards a segment's: only days where
+    both ends actually held value, so the pre-existence flat lead-in injects
+    no fake returns. For a single ticker this also means the series covers
+    exactly the holding period — an asset bought mid-window is measured from
+    the day it entered the book, not before."""
     out: dict[date, float] = {}
-    for i in range(1, len(points)):
-        prev, cur = points[i - 1], points[i]
-        if prev.total_brl > 0 and cur.total_brl > 0 and prev.twr_index > 0:
-            out[cur.date] = float(cur.twr_index / prev.twr_index) - 1
+    for i in range(1, len(days)):
+        if totals[i - 1] > 0 and totals[i] > 0 and twr[i - 1] > 0:
+            out[days[i]] = float(twr[i] / twr[i - 1]) - 1
+    return out
+
+
+def _asset_return_series(
+    transactions: list[Transaction], data: MarketData, tickers: set[str]
+) -> dict[str, dict[date, float]]:
+    """One daily total-return series per ticker, in BRL, from the same
+    engine that values the portfolio — so proventos, splits, custody moves
+    and FX are all handled exactly once, in one place."""
+    by_ticker: dict[str, list[Transaction]] = {}
+    for tx in transactions:
+        if tx.ticker in tickers:
+            by_ticker.setdefault(tx.ticker, []).append(tx)
+
+    out: dict[str, dict[date, float]] = {}
+    for ticker, subset in by_ticker.items():
+        totals, twr = compute_value_and_twr(subset, data)
+        out[ticker] = _twr_returns(totals, twr, data.days)
     return out
 
 
@@ -468,17 +628,6 @@ def _weighted_basket(
     return out
 
 
-def _daily_returns_from_closes(closes: dict[date, Decimal]) -> dict[date, float]:
-    items = sorted(closes.items())
-    out: dict[date, float] = {}
-    for i in range(1, len(items)):
-        previous = float(items[i - 1][1])
-        current = float(items[i][1])
-        if previous > 0:
-            out[items[i][0]] = current / previous - 1
-    return out
-
-
 def _group_key(position: ValuedPosition, level: str) -> str:
     sector = position.sector or NO_CLASS_LABEL
     if level == "sector":
@@ -496,6 +645,211 @@ def _is_priced(position: ValuedPosition) -> bool:
     if position.asset_class is not AssetClass.fixed_income:
         return True
     return parse_bond_ticker(position.ticker) is not None
+
+
+def _risk_return_stats(
+    returns: dict[date, float], risk_free: dict[date, float]
+) -> tuple[float, float, float | None, float, int, date] | None:
+    """(volatility, annual return, sharpe, realised return, n, first date).
+
+    Everything on the module's single calendar grid, so the three numbers
+    are one geometry: sharpe is exactly the slope of the line from the
+    risk-free anchor (0, rf) to the point (volatility, return). Plotting a
+    realised/compounded return on the vertical axis instead would break
+    that — the slope would stop being the sharpe by a volatility-drag term
+    — so the realised figure travels alongside as its own field, for the
+    tooltip, rather than as the coordinate.
+    """
+    days = sorted(returns)
+    if len(days) < MIN_OBS:
+        return None
+    values = [returns[d] for d in days]
+    std = _sample_std(values)
+    if std is None or std <= 0:
+        return None
+    volatility = std * math.sqrt(CALENDAR_DAYS)
+    annual = _annualize_return(_mean(values))
+    excess = [returns[d] - risk_free.get(d, 0.0) for d in days]
+    sharpe = _annualize_return(_mean(excess)) / volatility
+    realised = math.prod(1 + v for v in values) - 1
+    return volatility, annual, sharpe, realised, len(days), days[0]
+
+
+def _risk_return_point(
+    key: str,
+    label: str,
+    kind: str,
+    returns: dict[date, float],
+    risk_free: dict[date, float],
+    reference_start: date,
+    **extra,
+) -> RiskReturnPoint | None:
+    stats = _risk_return_stats(returns, risk_free)
+    if stats is None:
+        return None
+    volatility, annual, sharpe, realised, n, first = stats
+    return RiskReturnPoint(
+        key=key,
+        label=label,
+        kind=kind,
+        volatility_annual_pct=volatility,
+        return_annual_pct=annual,
+        sharpe=sharpe,
+        return_period_pct=realised,
+        observations=n,
+        first_date=first,
+        # A holding bought inside the window is measured from the day it
+        # entered the book, so the UI can say so instead of implying the
+        # figure covers the same span as everything around it. The reference
+        # is where the *portfolio's* own series starts in this window, not
+        # the window's first day: on a book younger than the window every
+        # point would otherwise be flagged, which says nothing.
+        partial_window=first > reference_start + timedelta(days=1),
+        **extra,
+    )
+
+
+def _segment_key(position: ValuedPosition) -> str:
+    """The position's segment, by the project's single definition (fixed
+    income wins over market, so Tesouro lands in `rf`, not `br`)."""
+    return segment_of(position.market, position.asset_class) or "outros"
+
+
+def _segment_return_series(
+    transactions: list[Transaction], data: MarketData
+) -> dict[str, dict[date, float]]:
+    """One TWR series per segment (Brasil, EUA, Cripto, Renda Fixa), from the
+    same engine over the segment's own transactions — the *realised* path of
+    that book, exactly like the whole-portfolio point, not a synthetic basket
+    re-weighted to today."""
+    subsets: dict[str, list[Transaction]] = {}
+    for tx in transactions:
+        key = segment_of(tx.market, tx.asset_class)
+        if key is not None:
+            subsets.setdefault(key, []).append(tx)
+
+    out: dict[str, dict[date, float]] = {}
+    for key, subset in subsets.items():
+        totals, twr = compute_value_and_twr(subset, data)
+        out[key] = _twr_returns(totals, twr, data.days)
+    return out
+
+
+def _build_risk_return(
+    positions: list[ValuedPosition],
+    asset_returns: dict[str, dict[date, float]],
+    group_returns: dict[str, dict[date, float]],
+    segment_returns: dict[str, dict[date, float]],
+    groups: list[RiskGroup],
+    portfolio_returns: dict[date, float],
+    cdi_returns: dict[date, float],
+    benchmark_returns: dict[str, dict[date, float]],
+    start: date,
+    total_value: Decimal,
+) -> RiskReturn:
+    out = RiskReturn()
+
+    # The anchor the whole chart is read against, at zero volatility. It has
+    # to be compounded over the same calendar grid as every point around it:
+    # the CDI only has a rate on business days, so averaging those ~251 rates
+    # and compounding them 365 times would invent yield the anchor never paid
+    # (21,97% a year instead of 14,59% on the real book). Zero on the days it
+    # does not accrue, which is what it in fact pays.
+    grid = sorted(portfolio_returns)
+    reference_start = grid[0] if grid else start
+    if len(grid) >= MIN_OBS:
+        out.risk_free_annual_pct = _annualize_return(
+            _mean([cdi_returns.get(d, 0.0) for d in grid])
+        )
+
+    by_ticker: dict[str, list[ValuedPosition]] = {}
+    for p in positions:
+        if _is_priced(p):
+            by_ticker.setdefault(p.ticker, []).append(p)
+
+    for ticker, held in sorted(
+        by_ticker.items(),
+        key=lambda kv: sum((p.market_value_brl for p in kv[1]), ZERO),
+        reverse=True,
+    ):
+        # Custodies of the same ticker share one price story; their value
+        # is summed so the bubble is the whole holding.
+        value = sum((p.market_value_brl for p in held), ZERO)
+        first = held[0]
+        point = _risk_return_point(
+            ticker,
+            first.asset_name or ticker,
+            "asset",
+            _restrict(asset_returns.get(ticker, {}), start),
+            cdi_returns,
+            reference_start,
+            weight_pct=float(value / total_value) if total_value > 0 else None,
+            market_value_brl=_cents(value),
+            segment=_segment_key(first),
+            asset_class=first.asset_class.value,
+            sector=first.sector or NO_CLASS_LABEL,
+            subsector=first.industry,
+        )
+        if point is not None:
+            out.assets.append(point)
+
+    for group in groups:
+        point = _risk_return_point(
+            group.key,
+            group.label,
+            "group",
+            group_returns.get(group.key, {}),
+            cdi_returns,
+            reference_start,
+            weight_pct=group.weight_pct,
+            market_value_brl=group.market_value_brl,
+        )
+        if point is not None:
+            out.groups.append(point)
+
+    by_segment: dict[str, Decimal] = {}
+    for p in positions:
+        key = _segment_key(p)
+        by_segment[key] = by_segment.get(key, ZERO) + p.market_value_brl
+    for key in SEGMENT_KEYS:
+        series = _restrict(segment_returns.get(key, {}), start)
+        value = by_segment.get(key, ZERO)
+        if value <= 0:
+            continue
+        point = _risk_return_point(
+            key,
+            SEGMENT_LABELS.get(key, key),
+            "segment",
+            series,
+            cdi_returns,
+            reference_start,
+            weight_pct=float(value / total_value) if total_value > 0 else None,
+            market_value_brl=_cents(value),
+            segment=key,
+        )
+        if point is not None:
+            out.segments.append(point)
+
+    out.portfolio = _risk_return_point(
+        "portfolio",
+        "Carteira",
+        "portfolio",
+        portfolio_returns,
+        cdi_returns,
+        reference_start,
+        weight_pct=1.0,
+        market_value_brl=_cents(total_value),
+    )
+
+    for key, label in (("ibov", "IBOV"), ("sp500", "S&P 500 (em BRL)")):
+        point = _risk_return_point(
+            key, label, "benchmark", _restrict(benchmark_returns.get(key, {}), start),
+            cdi_returns, reference_start,
+        )
+        if point is not None:
+            out.benchmarks.append(point)
+
+    return out
 
 
 # --- orchestrator ------------------------------------------------------------
@@ -518,21 +872,25 @@ def build_risk(db: Session, period: str = "1A", group_by: str = "sector") -> Ris
     total_value = sum((p.market_value_brl for p in positions), ZERO)
     result.overall.total_value_brl = _cents(total_value)
 
-    history = build_patrimony_history(db, "daily")
-    result.warnings.extend(w for w in history.warnings if w not in result.warnings)
-    if len(history.points) < 2:
+    # One market-data load feeds the portfolio series and every per-ticker
+    # series below (same closes, same FX, same days).
+    market_data = load_market_data(db, transactions)
+    result.warnings.extend(w for w in market_data.warnings if w not in result.warnings)
+    days = market_data.days
+    if len(days) < 2:
         result.warnings.append("Histórico patrimonial insuficiente para métricas de risco.")
         _fill_concentration(result.overall, positions, total_value)
         result.fixed_income = _fixed_income_risk(positions)
         return result
 
-    full_returns = _portfolio_returns(history.points)
-    end = history.points[-1].date
+    portfolio_totals, portfolio_twr = compute_value_and_twr(transactions, market_data)
+    full_returns = _twr_returns(portfolio_totals, portfolio_twr, days)
+    end = days[-1]
     start = _window_start(period, end)
     window_returns = _restrict(full_returns, start)
-    window_dates = [p.date for p in history.points if p.date >= start]
+    window_dates = [d for d in days if d >= start]
     window_index = [
-        float(p.twr_index) for p in history.points if p.date >= start
+        float(value) for day, value in zip(days, portfolio_twr) if day >= start
     ]
 
     _fill_overall_stats(result.overall, window_returns, window_index, window_dates, total_value)
@@ -545,7 +903,6 @@ def build_risk(db: Session, period: str = "1A", group_by: str = "sector") -> Ris
         result.rolling_volatility_63d = _rolling_volatility(window_returns, window_dates, 63)
         result.daily_returns = [RiskPoint(d, window_returns[d]) for d in sorted(window_returns)]
 
-    days = [p.date for p in history.points]
     bm_index, bm_warnings = benchmark_index_series(db, days, ("ibov", "sp500", "cdi"))
     result.warnings.extend(w for w in bm_warnings if w not in result.warnings)
     # Only convert keys benchmark_index_series actually returned — a fetch
@@ -562,8 +919,11 @@ def build_risk(db: Session, period: str = "1A", group_by: str = "sector") -> Ris
         result.overall, window_returns, ibov_returns, sp500_returns, cdi_returns
     )
 
+    asset_returns = _asset_return_series(
+        transactions, market_data, {p.ticker for p in positions if _is_priced(p)}
+    )
     groups, group_returns, priced_value = _build_groups(
-        db, positions, group_by, start, end, total_value
+        positions, group_by, asset_returns, start, total_value
     )
     result.groups = groups
     result.risk_universe_coverage_pct = (
@@ -572,6 +932,50 @@ def build_risk(db: Session, period: str = "1A", group_by: str = "sector") -> Ris
     result.overall.diversification_ratio = _fill_risk_contribution(groups, group_returns)
     result.group_correlation = _group_correlation(groups, group_returns)
 
+    # The S&P is quoted in USD; every other point on the risk-return chart
+    # is a BRL return, and mixing the two on one axis would credit the index
+    # with a currency move the holder never had. Converted at the same PTAX
+    # series the engine values USD positions with.
+    sp500_brl: dict[date, float] = {}
+    sp500_brl_full: dict[date, float] = {}
+    sp500_index = bm_index.get("sp500")
+    if sp500_index is not None and market_data.fx is not None:
+        converted = [
+            (level * rate) if (level is not None and rate is not None) else None
+            for level, rate in zip(sp500_index, market_data.fx)
+        ]
+        sp500_brl_full = _index_daily_returns(converted, days)
+        sp500_brl = _restrict(sp500_brl_full, start)
+
+    result.risk_return = _build_risk_return(
+        positions,
+        asset_returns,
+        group_returns,
+        _segment_return_series(transactions, market_data),
+        groups,
+        window_returns,
+        cdi_returns,
+        {"ibov": ibov_returns, "sp500": sp500_brl},
+        start,
+        total_value,
+    )
+
+    result.var_horizons = _var_horizons(result.overall, total_value)
+    # Séries cheias, recortadas por MÊS COMPLETO (não pela janela em dias):
+    # ver PERIOD_MONTHS. YTD são os meses completos do ano corrente.
+    if period == "YTD":
+        months_wanted = max(0, end.month - 1)
+    else:
+        months_wanted = PERIOD_MONTHS.get(period)
+    for key, label, series in (
+        ("ibov", "IBOV", bm_returns.get("ibov", {})),
+        ("sp500", "S&P 500 (em BRL)", sp500_brl_full),
+    ):
+        comparison = _benchmark_comparison(
+            key, label, full_returns, series, months_wanted
+        )
+        if comparison is not None:
+            result.benchmark_comparison.append(comparison)
     result.stress_scenarios = _stress_scenarios(db, positions, period, total_value)
     result.fixed_income = _fixed_income_risk(positions)
 
@@ -607,12 +1011,22 @@ def _fill_overall_stats(
     std = _sample_std(xs)
     mean = _mean(xs)
     if std is not None:
-        overall.volatility_annual_pct = std * math.sqrt(TRADING_DAYS)
+        # Calendar-daily series -> CALENDAR_DAYS (see the constants above).
+        overall.volatility_annual_pct = std * math.sqrt(CALENDAR_DAYS)
     # Sharpe/Sortino need the CDI series (risk-free), fetched by the caller
     # alongside the benchmarks; filled in by _fill_beta_and_tracking_error.
 
-    var95, cvar95 = _historical_var_cvar(xs, 0.95)
-    var99, _cvar99 = _historical_var_cvar(xs, 0.99)
+    # Daqui para baixo, a grade é a de dias de negociação (ver o bloco de
+    # constantes): estas quatro descrevem a distribuição de perda de um dia.
+    trading = [returns[d] for d in sorted(_trading_only(returns))]
+    overall.trading_observations = len(trading)
+    if len(trading) < MIN_OBS:
+        return
+    std_t = _sample_std(trading)
+    mean_t = _mean(trading)
+
+    var95, cvar95 = _historical_var_cvar(trading, 0.95)
+    var99, _cvar99 = _historical_var_cvar(trading, 0.99)
     if var95 is not None:
         overall.var_hist_95_pct = var95
         overall.var_hist_95_brl = _cents(Decimal(str(var95)) * total_value)
@@ -622,12 +1036,145 @@ def _fill_overall_stats(
     if var99 is not None:
         overall.var_hist_99_pct = var99
         overall.var_hist_99_brl = _cents(Decimal(str(var99)) * total_value)
-    if std is not None:
-        overall.var_parametric_95_pct = mean - Z_95 * std
+    if std_t is not None:
+        overall.var_parametric_95_pct = mean_t - Z_95 * std_t
 
-    skew, kurt = _skew_kurtosis(xs)
+    skew, kurt = _skew_kurtosis(trading)
     overall.skewness = skew
     overall.kurtosis_excess = kurt
+
+
+MIN_MONTHS = 12  # menos que isso não sustenta captura/batting (Morningstar usa 12)
+MONTHS_PER_YEAR = 12
+
+# Quantos meses COMPLETOS cada janela vale. A métrica é mensal e alinhada a
+# fim de mês, não a uma janela de N dias: "captura de 1 ano" são os 12 meses
+# completos anteriores, como Morningstar reporta. Contar 365 dias corridos
+# deixaria 11 meses completos (a janela começa no meio de um mês e termina no
+# meio de outro) e o número simplesmente não sairia.
+PERIOD_MONTHS = {"3M": 3, "6M": 6, "1A": 12, "2A": 24}
+
+
+def _monthly_returns(daily: dict[date, float]) -> dict[tuple[int, int], float]:
+    """Compounds a daily series into calendar months. A month is kept only
+    if it has a return for every day the series covers within it, so a
+    half-month at either edge of the window never poses as a full one."""
+    if not daily:
+        return {}
+    days = sorted(daily)
+    start, end = days[0], days[-1]
+    buckets: dict[tuple[int, int], list[float]] = {}
+    for day in days:
+        buckets.setdefault((day.year, day.month), []).append(daily[day])
+
+    # Only the window's first and last months can be partial. The 3-day
+    # tolerance is for an edge landing on a weekend.
+    first_key, last_key = (start.year, start.month), (end.year, end.month)
+    out: dict[tuple[int, int], float] = {}
+    for key, values in buckets.items():
+        if key == first_key and start.day > 3:
+            continue
+        if key == last_key:
+            next_month = date(key[0] + key[1] // 12, key[1] % 12 + 1, 1)
+            if (next_month - end).days > 3:
+                continue
+        out[key] = math.prod(1 + v for v in values) - 1
+    return out
+
+
+def _geometric_mean(values: list[float]) -> float | None:
+    if not values:
+        return None
+    product = math.prod(1 + v for v in values)
+    if product <= 0:
+        return None
+    return product ** (1 / len(values)) - 1
+
+
+def _benchmark_comparison(
+    key: str,
+    label: str,
+    portfolio_daily: dict[date, float],
+    benchmark_daily: dict[date, float],
+    months_wanted: int | None = None,
+) -> BenchmarkComparison | None:
+    """Capture ratios, batting average and information ratio, on the months
+    both series actually share — the last `months_wanted` of them."""
+    port = _monthly_returns(portfolio_daily)
+    bench = _monthly_returns(benchmark_daily)
+    common = sorted(port.keys() & bench.keys())
+    if months_wanted is not None:
+        common = common[-months_wanted:]
+    if len(common) < MIN_MONTHS:
+        return None
+
+    up = [m for m in common if bench[m] > 0]
+    down = [m for m in common if bench[m] < 0]
+    out = BenchmarkComparison(
+        key=key,
+        label=label,
+        months=len(common),
+        up_months=len(up),
+        down_months=len(down),
+        batting_average=sum(1 for m in common if port[m] >= bench[m]) / len(common),
+    )
+
+    # Morningstar's definition: geometric average of each side over the same
+    # months, then the ratio. A capture ratio needs a non-zero denominator,
+    # which is why each side is gated on its own month count.
+    if up:
+        p_up, b_up = _geometric_mean([port[m] for m in up]), _geometric_mean([bench[m] for m in up])
+        if p_up is not None and b_up not in (None, 0):
+            out.upside_capture = p_up / b_up
+    if down:
+        p_dn, b_dn = _geometric_mean([port[m] for m in down]), _geometric_mean([bench[m] for m in down])
+        if p_dn is not None and b_dn not in (None, 0):
+            out.downside_capture = p_dn / b_dn
+
+    active = [port[m] - bench[m] for m in common]
+    te = _sample_std(active)
+    out.active_return_annual_pct = (1 + _mean(active)) ** MONTHS_PER_YEAR - 1
+    if te is not None and te > 0:
+        out.tracking_error_annual_pct = te * math.sqrt(MONTHS_PER_YEAR)
+        out.information_ratio = out.active_return_annual_pct / out.tracking_error_annual_pct
+    return out
+
+
+def _var_horizons(overall: RiskOverall, total_value: Decimal) -> list[VarHorizon]:
+    """Scales the 1-day figures out to the other horizons.
+
+    The square-root-of-time rule holds while daily returns are roughly
+    independent and the drift is negligible against the noise — true for
+    days, not for quarters. That is why the list stops at a month: an
+    "annual VaR" scaled this way would be dominated by the drift it ignores,
+    and is not a quantity anyone reports.
+    """
+    out: list[VarHorizon] = []
+    for days, label in VAR_HORIZONS:
+        factor = math.sqrt(days)
+
+        def scaled(pct: float | None) -> tuple[float | None, Decimal | None]:
+            if pct is None:
+                return None, None
+            value = pct * factor
+            return value, _cents(Decimal(str(value)) * total_value)
+
+        v95, v95_brl = scaled(overall.var_hist_95_pct)
+        v99, v99_brl = scaled(overall.var_hist_99_pct)
+        c95, c95_brl = scaled(overall.cvar_hist_95_pct)
+        out.append(
+            VarHorizon(
+                days=days,
+                label=label,
+                var_hist_95_pct=v95,
+                var_hist_95_brl=v95_brl,
+                var_hist_99_pct=v99,
+                var_hist_99_brl=v99_brl,
+                cvar_hist_95_pct=c95,
+                cvar_hist_95_brl=c95_brl,
+            )
+        )
+    return out
 
 
 def _fill_beta_and_tracking_error(
@@ -640,27 +1187,33 @@ def _fill_beta_and_tracking_error(
     overall.beta_ibov = _beta(portfolio_returns, ibov_returns)
     overall.beta_sp500 = _beta(portfolio_returns, sp500_returns)
 
-    common = sorted(portfolio_returns.keys() & cdi_returns.keys())
+    # Excess return over the *whole* portfolio series, not only the days the
+    # CDI has a rate for. Restricting to CDI-paired dates silently deletes
+    # every weekend and holiday from the measurement, and those days are not
+    # empty: crypto trades all seven, and over the last year the 115 days
+    # outside the CDI calendar compounded to +0,808% — real return the ratio
+    # never saw. Compounding the paired subset reproduces +5,625% against the
+    # book's actual +6,479%; the full calendar grid reproduces it exactly.
+    # The risk-free is zero on those days because that is the fact — the CDI
+    # accrues on business days only.
+    common = sorted(portfolio_returns)
     if len(common) >= MIN_OBS:
-        excess = [portfolio_returns[d] - cdi_returns[d] for d in common]
+        excess = [portfolio_returns[d] - cdi_returns.get(d, 0.0) for d in common]
         std_excess = _sample_std(excess)
         if std_excess is not None:
-            overall.tracking_error_cdi_pct = std_excess * math.sqrt(TRADING_DAYS)
-        mean_excess = _mean(excess)
-        annual_excess = _annualize_return(mean_excess)
+            overall.tracking_error_cdi_pct = std_excess * math.sqrt(CALENDAR_DAYS)
+        annual_excess = _annualize_return(_mean(excess))
 
-        # Sharpe's own volatility, over the exact same CDI-paired dates as
-        # the excess-return numerator above — not overall.volatility_annual_pct
-        # (the full window), which would silently mismatch the numerator's
-        # sample whenever the CDI series has any gap within the window.
-        paired_vol = _sample_std([portfolio_returns[d] for d in common])
-        if paired_vol is not None and paired_vol > 0:
-            overall.sharpe = annual_excess / (paired_vol * math.sqrt(TRADING_DAYS))
+        # Numerator and denominator now share one sample by construction, so
+        # the denominator *is* the volatility card — no second, subtly
+        # different volatility living inside the ratio.
+        if overall.volatility_annual_pct:
+            overall.sharpe = annual_excess / overall.volatility_annual_pct
 
         downside = [min(e, 0.0) for e in excess]
         downside_std = math.sqrt(sum(d * d for d in downside) / len(downside))
         if downside_std > 0:
-            overall.sortino = annual_excess / (downside_std * math.sqrt(TRADING_DAYS))
+            overall.sortino = annual_excess / (downside_std * math.sqrt(CALENDAR_DAYS))
 
 
 def _beta(seg: dict[date, float], bm: dict[date, float]) -> float | None:
@@ -682,8 +1235,18 @@ def _fill_concentration(
 ) -> None:
     if total_value <= 0:
         return
+    # By ticker, not by position row: the engine keys crypto by custody, so
+    # BTC held hot *and* cold arrives as two rows. They are the same asset at
+    # the same price — correlation 1 by construction — and counting them
+    # separately invents diversification — it understates top-5 weight and
+    # overstates the effective number of positions by roughly one whole
+    # position. Institution and segment below are already aggregations, so
+    # they never had the problem.
+    by_ticker: dict[str, Decimal] = {}
+    for p in positions:
+        by_ticker[p.ticker] = by_ticker.get(p.ticker, ZERO) + p.market_value_brl
     weights = sorted(
-        (float(p.market_value_brl / total_value) for p in positions), reverse=True
+        (float(value / total_value) for value in by_ticker.values()), reverse=True
     )
     overall.hhi_position = _hhi(weights)
     if overall.hhi_position:
@@ -717,24 +1280,22 @@ def _fill_fx_exposure(
 
 
 def _build_groups(
-    db: Session,
     positions: list[ValuedPosition],
     group_by: str,
+    asset_returns: dict[str, dict[date, float]],
     start: date,
-    end: date,
     total_value: Decimal,
 ) -> tuple[list[RiskGroup], dict[str, dict[date, float]], Decimal]:
     by_group: dict[str, list[ValuedPosition]] = {}
     for p in positions:
         by_group.setdefault(_group_key(p, group_by), []).append(p)
 
-    closes_cache: dict[str, dict[date, float]] = {}
+    windowed: dict[str, dict[date, float]] = {}
 
     def ticker_returns(ticker: str) -> dict[date, float]:
-        if ticker not in closes_cache:
-            closes = _cached_closes(db, ticker, start, end)
-            closes_cache[ticker] = _daily_returns_from_closes(closes)
-        return closes_cache[ticker]
+        if ticker not in windowed:
+            windowed[ticker] = _restrict(asset_returns.get(ticker, {}), start)
+        return windowed[ticker]
 
     groups: list[RiskGroup] = []
     group_returns: dict[str, dict[date, float]] = {}
@@ -765,7 +1326,7 @@ def _build_groups(
             basket = _weighted_basket(returns_by_ticker, weights)
             var = _variance(basket)
             if var is not None:
-                volatility = math.sqrt(var) * math.sqrt(TRADING_DAYS)
+                volatility = math.sqrt(var) * math.sqrt(CALENDAR_DAYS)
                 group_returns[label] = basket
                 priced_value += sum(
                     (m.market_value_brl for m in priceable if m.ticker in returns_by_ticker),
