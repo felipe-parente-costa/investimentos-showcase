@@ -9,9 +9,9 @@ Aplicação web **pessoal, single-user** que consolida investimentos de três fo
 B3 (extrato de Movimentação), Avenue (extrato CSV) e Binance (exports de trade/order
 history) — em um dashboard único: patrimônio consolidado em BRL, seções EUA e cripto
 em USD nativo, renda (dividendos/JCP/rendimentos), dividend yield 12m por posição e
-da carteira, TWR contra benchmarks (CDI, IBOV, S&P 500, BTC), uma seção de risco
-completa (volatilidade, VaR/CVaR, drawdown, betas, concentração e correlação), CAPM e
-relatório mensal.
+da carteira, TWR contra benchmarks (CDI, IBOV, S&P 500, BTC, IPCA+6 e Dólar+5), uma
+seção de risco completa (volatilidade, VaR/CVaR, drawdown, betas, concentração,
+correlação e um plano risco × retorno), CAPM e relatório mensal.
 
 A ideia central é **automatizar a vida do investidor**: você arrasta o extrato
 exportado da corretora/exchange e a plataforma calcula tudo sozinha — posições, preço
@@ -44,8 +44,12 @@ ajustes e correções auditáveis.
 | ![Renda Fixa](docs/screenshots/renda-fixa.png) | ![Lançamentos](docs/screenshots/lancamentos.png) |
 
 **Risco — terminal de risco da carteira consolidada:** volatilidade, Sharpe/Sortino,
-drawdown (magnitude e duração), VaR/CVaR, betas, concentração, contribuição de risco por
-setor e cenários de estresse.
+drawdown (magnitude e duração), VaR/CVaR com seletor de horizonte (1 dia, 1 semana,
+1 mês), betas, concentração, contribuição de risco por setor e cenários de estresse.
+Um gráfico **Risco × Retorno** põe ativos, setores, segmentos, a carteira e os
+benchmarks no mesmo plano volatilidade × retorno, e o bloco **contra o benchmark**
+reporta captura de alta/baixa, batting average, retorno ativo, tracking error e
+information ratio contra IBOV e S&P 500.
 
 ![Risco](docs/screenshots/risco.png)
 
@@ -167,6 +171,21 @@ faz: Tesouro Direto é marcado a mercado e participa normalmente de volatilidade
 correlação e contribuição de risco; renda fixa privada fica a custo e **é excluída de todo
 cálculo baseado em preço** — volatilidade ou VaR sobre um papel que não é remarcado seria
 risco fabricado. Ela ganha uma lente própria: concentração por indexador e por emissor.
+
+**Duas grades, cada uma com sua razão.** O que mede o *caminho* do retorno
+(volatilidade, Sharpe, Sortino, tracking error, vol móvel) roda em **dias corridos,
+anualizado por ×365**: descartar fim de semana perderia retorno real de cripto, que
+negocia sete dias por semana. Já a distribuição de perda de **um dia** (VaR, CVaR, VaR
+paramétrico, assimetria, curtose) roda em **dias de negociação**, porque "um dia" em
+relatório de risco é pregão por convenção — misturar sábados parados dilui o quantil e
+fabrica cauda gorda. As duas contagens aparecem lado a lado no cabeçalho da seção.
+
+**Toda série de risco sai do motor de patrimônio, nunca de preço bruto.** Ler o
+fechamento direto erraria três coisas ao mesmo tempo: ignoraria proventos (um FII pode
+mudar de sinal na janela de 1 ano), misturaria BRL e USD no mesmo eixo, e leria um
+desdobramento como queda de 80%. As cestas de setor e os pontos do gráfico risco ×
+retorno consomem a série de TWR diário que o próprio motor calcula por ticker — em BRL,
+com proventos como fluxo e desdobramento aplicado à quantidade.
 
 **Correlação em três recortes.** Matriz de Pearson dos retornos diários entre ativos
 (com filtro manual), entre setores/sub-setores (cestas ponderadas por valor) e um
