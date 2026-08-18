@@ -1,3 +1,4 @@
+import { STATIC_DEMO } from '../api/staticDemo'
 import { useEffect, useState } from 'react'
 import {
   getMarket,
@@ -71,7 +72,7 @@ function Card({
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-sm text-slate-400">{title}</p>
-        {stale && (
+        {stale && !STATIC_DEMO && (
           <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-300">
             desatualizado
           </span>

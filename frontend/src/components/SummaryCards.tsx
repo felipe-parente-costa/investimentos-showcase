@@ -1,4 +1,5 @@
 import type { PortfolioResponse } from '../api/client'
+import { STATIC_DEMO } from '../api/staticDemo'
 import { formatMoney, formatPercent, formatSignedPercent } from '../lib/format'
 
 export interface MonthChange {
@@ -19,8 +20,11 @@ function changeColor(value: number): string {
 }
 
 export default function SummaryCards({ portfolio, twrIndex, monthChange }: Props) {
+  // In the frozen showcase every quote is stale by construction — the
+  // bundle has a date and the banner says so — and an amber warning there
+  // reads as a defect instead of the truth.
   const anyStale =
-    portfolio.fx_stale || portfolio.positions.some((p) => p.quote_stale)
+    !STATIC_DEMO && (portfolio.fx_stale || portfolio.positions.some((p) => p.quote_stale))
   const dayChange =
     portfolio.day_change_brl != null ? Number(portfolio.day_change_brl) : null
   const twrTotal = twrIndex != null ? (Number(twrIndex) - 100) / 100 : null

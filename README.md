@@ -5,6 +5,12 @@
 > aqui corresponde a uma carteira real. Este é um repositório-vitrine da versão demo;
 > o histórico de desenvolvimento vive em um repositório privado.
 
+> **[Ver a demonstração ao vivo →](https://felipe-parente-costa.github.io/investimentos-showcase/)**
+> Uma cópia congelada da plataforma, com **dados sintéticos** gerados por script
+> (semente fixa), publicada como página estática: sem backend, sem banco e sem
+> nenhuma rota de escrita. Os tickers são de empresas reais que **não** compõem a
+> carteira de ninguém; todos os valores são fabricados.
+
 Aplicação web **pessoal, single-user** que consolida investimentos de três fontes —
 B3 (extrato de Movimentação), Avenue (extrato CSV) e Binance (exports de trade/order
 history) — em um dashboard único: patrimônio consolidado em BRL, seções EUA e cripto

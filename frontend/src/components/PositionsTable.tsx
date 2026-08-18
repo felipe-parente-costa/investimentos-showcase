@@ -1,3 +1,4 @@
+import { STATIC_DEMO } from '../api/staticDemo'
 import { useMemo, useState } from 'react'
 import type { Position } from '../api/client'
 import {
@@ -454,7 +455,7 @@ export default function PositionsTable({
                     {position.priced ? (
                       <>
                         {formatMoney(position.quote_price, position.quote_currency ?? 'BRL')}
-                        {position.quote_stale && (
+                        {position.quote_stale && !STATIC_DEMO && (
                           <span title="Cotação desatualizada" className="ml-1 text-amber-400">
                             •
                           </span>
