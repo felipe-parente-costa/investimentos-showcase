@@ -1,3 +1,4 @@
+import { STATIC_DEMO } from '../api/staticDemo'
 import { useCallback, useEffect, useState } from 'react'
 import {
   CartesianGrid,
@@ -168,14 +169,17 @@ export default function Relatorios() {
             Snapshots congelados da carteira no fim de cada mês.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={generate}
-          disabled={generating}
-          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-inkbrass hover:bg-sky-500 disabled:opacity-50"
-        >
-          {generating ? 'Gerando…' : 'Gerar relatório do mês atual'}
-        </button>
+        {/* Generating a snapshot writes: off in the frozen showcase. */}
+        {!STATIC_DEMO && (
+          <button
+            type="button"
+            onClick={generate}
+            disabled={generating}
+            className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-inkbrass hover:bg-sky-500 disabled:opacity-50"
+          >
+            {generating ? 'Gerando…' : 'Gerar relatório do mês atual'}
+          </button>
+        )}
       </div>
 
       {error && (

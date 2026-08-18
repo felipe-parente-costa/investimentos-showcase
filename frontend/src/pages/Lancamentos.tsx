@@ -1,3 +1,4 @@
+import { STATIC_DEMO } from '../api/staticDemo'
 import { useCallback, useEffect, useState } from 'react'
 import {
   createTransaction,
@@ -185,13 +186,16 @@ export default function Lancamentos() {
             />
           </label>
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing('new')}
-          className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-inkbrass hover:bg-sky-500"
-        >
-          Novo lançamento
-        </button>
+        {/* Nothing to write to in the frozen showcase. */}
+        {!STATIC_DEMO && (
+          <button
+            type="button"
+            onClick={() => setEditing('new')}
+            className="rounded-lg bg-sky-600 px-4 py-1.5 text-sm font-medium text-inkbrass hover:bg-sky-500"
+          >
+            Novo lançamento
+          </button>
+        )}
       </div>
 
       {editing !== null && (
@@ -285,7 +289,7 @@ export default function Lancamentos() {
                   {formatMoney(tx.unit_price, tx.currency)}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  {tx.source === 'manual' ? (
+                  {tx.source === 'manual' && !STATIC_DEMO ? (
                     <span className="flex justify-end gap-2 text-xs">
                       <button
                         type="button"

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import DemoNotice from './components/DemoNotice'
+import { STATIC_DEMO } from './api/staticDemo'
 import Dashboard from './pages/Dashboard'
 import Import from './pages/Import'
 import Lancamentos from './pages/Lancamentos'
@@ -55,6 +57,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      {STATIC_DEMO && <DemoNotice />}
       <header className="flex items-center gap-6 border-b border-slate-800 px-6 py-4">
         <h1 className="flex items-center gap-2.5 font-display text-xl font-semibold">
           {/* Marca "Ledger": camadas em base estável + ponto-patrimônio

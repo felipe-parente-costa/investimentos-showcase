@@ -1,3 +1,5 @@
+import { STATIC_DEMO, staticRequest } from './staticDemo'
+
 const BASE_URL = '/api'
 
 export interface HealthResponse {
@@ -103,6 +105,9 @@ async function request<T>(
   path: string,
   options?: { method?: string; body?: unknown },
 ): Promise<T> {
+  if (STATIC_DEMO) {
+    return staticRequest<T>(path, options?.method ?? 'GET')
+  }
   const response = await fetch(`${BASE_URL}${path}`, {
     method: options?.method ?? 'GET',
     headers: options?.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,

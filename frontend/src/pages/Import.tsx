@@ -1,3 +1,4 @@
+import { STATIC_DEMO } from '../api/staticDemo'
 import { useMemo, useRef, useState } from 'react'
 import {
   importFile,
@@ -177,6 +178,35 @@ export default function Import({ onGoToDashboard }: Props) {
       setError(exc instanceof Error ? exc.message : 'Falha ao importar.')
       setStatus('error')
     }
+  }
+
+  // The published showcase is a frozen copy with no backend, so there is
+  // nothing to import into. The screen still describes what the real
+  // importer does — it is the heart of the project — with the action off.
+  if (STATIC_DEMO) {
+    return (
+      <main className="mx-auto max-w-3xl space-y-6 p-6">
+        <div>
+          <h2 className="font-display text-lg font-semibold">Importar transações</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Na plataforma real, esta tela recebe o extrato de Movimentação da B3, o
+            extrato da Avenue e o histórico da Binance. O arquivo é parseado,
+            reconciliado contra os eventos de empréstimo e importado sem duplicar
+            nada — o mesmo arquivo pode ser enviado quantas vezes for.
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <p className="text-sm text-slate-300">
+            Esta demonstração é estática: os dados são fabricados e não há backend
+            para receber arquivos, então o envio está desligado.
+          </p>
+          <p className="mt-3 text-caption text-slate-500">
+            O código do importador está no repositório: <code>backend/app/parsers</code>{' '}
+            e <code>backend/app/services/lending.py</code>.
+          </p>
+        </div>
+      </main>
+    )
   }
 
   return (
