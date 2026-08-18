@@ -1,0 +1,1 @@
+{"period": "3M", "segment": "crypto", "tickers": ["ADA", "SOL"], "matrix": [[1.0, 0.6446215105655363], [0.6446215105655363, 1.0]], "warnings": ["DOT: cotações insuficientes no período para correlação"]}
